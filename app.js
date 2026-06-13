@@ -118,6 +118,9 @@ function compilePostHtmlNode(post) {
     const canDelete = isAuthor && minutesSinceCreation < 5;
 
     const formattedTime = formatTimestampRelative(post.created_at);
+    
+    // Apply red color style instantly if database confirms user already liked it
+    const heartClass = post.has_user_liked ? 'text-rose-600' : '';
 
     postCard.innerHTML = `
         <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-lg flex-shrink-0" onclick="event.stopPropagation(); openThreadModal('${post.id}')">👤</div>
@@ -136,11 +139,11 @@ function compilePostHtmlNode(post) {
             <div class="flex items-center space-x-6 mt-3 text-slate-400 text-xs font-medium">
                 <button class="flex items-center space-x-1.5 hover:text-indigo-600 group transition" onclick="event.stopPropagation(); openThreadModal('${post.id}')">
                     <span class="text-base group-hover:scale-110 transition">💬</span>
-                    <span>${post.reply_count || 0}</span>
+                    <span>${post.reply_count}</span>
                 </button>
-                <button class="flex items-center space-x-1.5 hover:text-rose-600 group transition" onclick="event.stopPropagation(); togglePostLikeState('${post.id}', this)">
+                <button class="flex items-center space-x-1.5 hover:text-rose-600 group transition ${heartClass}" onclick="event.stopPropagation(); togglePostLikeState('${post.id}', this)">
                     <span class="text-base group-hover:scale-110 transition">❤️</span>
-                    <span class="like-counter-val">${post.likes_count || 0}</span>
+                    <span class="like-counter-val">${post.likes_count}</span>
                 </button>
             </div>
         </div>
@@ -148,14 +151,17 @@ function compilePostHtmlNode(post) {
     return postCard;
 }
 
-// ==========================================
-// 4. DATA WRITE OPERATIONS (MUTATIONS)
-// ==========================================
 
+
+// ==========================================
+// 1. UPDATE POST SUBMISSION (TARGETED INJECTION)
+// ==========================================
 async function handlePostSubmit() {
     const textarea = document.getElementById('post-textarea');
     const categorySelect = document.getElementById('category-select');
     const submitBtn = document.getElementById('submit-post-btn');
+    
+    if (!textarea || !categorySelect || !submitBtn) return;
     
     const content = textarea.value.trim();
     const category = categorySelect.value;
@@ -165,9 +171,12 @@ async function handlePostSubmit() {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Posting...';
 
-    const { error } = await supabaseClient
+    // Insert to database
+    const { data: newRowData, error } = await supabaseClient
         .from('posts')
-        .insert([{ content, category, session_id: currentSessionId }]);
+        .insert([{ content, category, session_id: currentSessionId }])
+        .select() // Tells Supabase to immediately return the created row with its new ID
+        .single();
 
     submitBtn.disabled = false;
     submitBtn.textContent = 'Post Anon';
@@ -177,10 +186,26 @@ async function handlePostSubmit() {
         return;
     }
 
+    // Clear the input box instantly
     textarea.value = '';
-    document.getElementById('char-counter').textContent = '0 / 280';
+    const charCounter = document.getElementById('char-counter');
+    if (charCounter) charCounter.textContent = '0 / 280';
     
-    fetchAndRenderFeed();
+    // TARGETED INJECTION: Build ONLY this one post and slide it to the top.
+    // No full feed reload, no flashing.
+    const container = document.getElementById('feed-container');
+    if (container.querySelector('div.text-center')) container.innerHTML = '';
+
+    // Assign default starting metrics for your local view
+    newRowData.likes_count = 0;
+    newRowData.reply_count = 0;
+    newRowData.has_user_liked = false;
+
+    const modernNode = compilePostHtmlNode(newRowData);
+    modernNode.classList.add('bg-indigo-50/40'); // Soft confirmation flash
+    container.insertBefore(modernNode, container.firstChild);
+
+    setTimeout(() => modernNode.classList.remove('bg-indigo-50/40'), 1500);
 }
 
 async function executePostDeletion(postId) {
@@ -343,11 +368,23 @@ async function handleReplySubmit() {
 
     textarea.value = '';
     
-    // Refresh the comments list inside the modal overlay view
+    // A. Re-render ONLY the small comments list inside the modal popup window
     await fetchAndRenderComments(globalActiveFocusedPostId);
     
-    // FIX: Force the primary background timeline stream to pull updated counter numbers
-    await fetchAndRenderFeed(); 
+    // B. TARGETED INJECTION: Find the specific background post card and update its counter number
+    const backgroundPostCard = document.getElementById(`ui-post-${globalActiveFocusedPostId}`);
+    if (backgroundPostCard) {
+        // Find the comment counter slot inside that specific post element block
+        const commentIcons = backgroundPostCard.querySelectorAll('button');
+        // The comment button is the first button inside our template layout
+        if (commentIcons && commentIcons[0]) {
+            const counterSpan = commentIcons[0].querySelector('span:not(.text-base)');
+            if (counterSpan) {
+                let existingCount = parseInt(counterSpan.textContent) || 0;
+                counterSpan.textContent = existingCount + 1; // Bump it up by 1 instantly
+            }
+        }
+    }
 }
 
 function closeThreadModal() {
@@ -381,27 +418,59 @@ function filterByCategory(categoryName, elementNode) {
 // 7. REAL-TIME DATA REPLICATION SYNCHRONIZER
 // ==========================================
 
+// ==========================================
+// REPLACE SECTION 7 IN YOUR APP.JS
+// ==========================================
 function initializeRealTimePipeline() {
     supabaseClient
         .channel('public-feed-stream')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload) => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, async (payload) => {
+            
+            // A. If a brand new post is inserted into the database
             if (payload.eventType === 'INSERT') {
+                // Only inject it if the user is looking at 'All Feed' or matching category
                 if (globalCurrentCategory === 'all' || globalCurrentCategory === payload.new.category) {
                     if (globalCurrentFeedTab === 'latest') {
                         const container = document.getElementById('feed-container');
                         
-                        if(container.querySelector('div.text-center')) container.innerHTML = '';
+                        // Clear out the "No posts here yet" message if it's there
+                        if (container.querySelector('div.text-center')) container.innerHTML = '';
                         
-                        const newPostNode = compilePostHtmlNode(payload.new);
-                        newPostNode.classList.add('bg-indigo-50/70', 'scale-[0.99]');
+                        // Set up fresh default metrics for the new post object
+                        const newPost = payload.new;
+                        newPost.likes_count = 0;
+                        newPost.reply_count = 0;
+                        newPost.has_user_liked = false;
+                        
+                        // Compile the HTML block for the incoming post
+                        const newPostNode = compilePostHtmlNode(newPost);
+                        
+                        // Add a beautiful soft blue flash animation so the user notices the live arrival
+                        newPostNode.classList.add('bg-indigo-50/80', 'scale-[0.99]');
                         container.insertBefore(newPostNode, container.firstChild);
                         
+                        // Smoothly fade the background highlight out after 1.5 seconds
                         setTimeout(() => {
-                            newPostNode.classList.remove('bg-indigo-50/70', 'scale-[0.99]');
-                        }, 1000);
+                            newPostNode.classList.remove('bg-indigo-50/80', 'scale-[0.99]');
+                        }, 1500);
+                    } else {
+                        // If they are on the trending tab, just silently rebuild the feed order
+                        fetchAndRenderFeed();
                     }
                 }
-            } else {
+            } 
+            
+            // B. If a post gets deleted externally, instantly vanish it from the screen
+            else if (payload.eventType === 'DELETE') {
+                const element = document.getElementById(`ui-post-${payload.old.id}`);
+                if (element) {
+                    element.style.opacity = '0';
+                    setTimeout(() => element.remove(), 300);
+                }
+            } 
+            
+            // C. For any other generic changes, run a safe background update sync
+            else {
                 fetchAndRenderFeed();
             }
         })
