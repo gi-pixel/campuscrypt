@@ -1,0 +1,407 @@
+// ==========================================
+// 1. CONFIGURATION & IDENTITY INITIALIZATION
+// ==========================================
+
+// Replace these values with your actual credentials from your Supabase Project Settings
+const SUPABASE_URL = 'https://your-project-id.supabase.co';
+const SUPABASE_ANON_KEY = 'your-anon-public-key';
+
+// Automatically resolve or generate a unique tracking session ID for this browser
+let currentSessionId = localStorage.getItem('crypt_session');
+if (!currentSessionId) {
+    currentSessionId = `SESSION_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+    localStorage.setItem('crypt_session', currentSessionId);
+}
+
+// Display the local identifier strings onto the HTML UI nodes
+document.getElementById('local-session-badge').textContent = currentSessionId.substring(0, 15) + '...';
+document.getElementById('mobile-session-badge').textContent = currentSessionId.substring(0, 10) + '...';
+
+// Instantiate the global Supabase client, injecting the session token into the system headers
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: {
+        headers: {
+            'x-session-id': currentSessionId,
+        },
+    },
+});
+
+// ==========================================
+// 2. GLOBAL STATE APPARATUS
+// ==========================================
+let globalCurrentFeedTab = 'latest';     // 'latest' or 'trending'
+let globalCurrentCategory = 'all';       // 'all', 'cs101', 'math201', 'professor', 'campus', 'general'
+let globalActiveFocusedPostId = null;   // Tracks the post ID loaded inside the active comment modal
+
+// Run the core engine bootstrap sequence when the browser compiles the page layout
+window.addEventListener('DOMContentLoaded', () => {
+    fetchAndRenderFeed();
+    initializeRealTimePipeline();
+});
+
+// ==========================================
+// 3. DATA READ OPERATIONS (FETCH & RENDER)
+// ==========================================
+
+async function fetchAndRenderFeed() {
+    const feedContainer = document.getElementById('feed-container');
+    
+    // Construct the database query base
+    let query = supabase.from('posts').select('*');
+
+    // Apply the category filters selectively
+    if (globalCurrentCategory !== 'all') {
+        query = query.eq('category', globalCurrentCategory);
+    }
+
+    // Apply structural algorithm sorting depending on the active top tab
+    if (globalCurrentFeedTab === 'trending') {
+        // Simple algorithmic metric: Sort by most likes, breaking ties with timeline location
+        query = query.order('likes_count', { ascending: false }).order('created_at', { ascending: false });
+    } else {
+        // Standard strict linear timeline stream
+        query = query.order('created_at', { ascending: false });
+    }
+
+    // Restrict maximum transaction sizes to safeguard limits
+    const { data: posts, error } = await query.limit(20);
+
+    if (error) {
+        console.error('Database connection error:', error.message);
+        feedContainer.innerHTML = `<div class="p-4 text-rose-500 font-medium text-center bg-rose-50 rounded-xl">Failed to synchronize campus data. Verify Supabase keys.</div>`;
+        return;
+    }
+
+    // Check if the current filter matrix returns an empty feed state
+    if (!posts || posts.length === 0) {
+        feedContainer.innerHTML = `
+            <div class="p-8 text-center text-slate-400">
+                <p class="text-3xl mb-2">🤷‍♂️</p>
+                <p class="font-medium">No posts here yet. Be the first to drop one!</p>
+            </div>`;
+        return;
+    }
+
+    // Build the dynamic feed component timeline elements
+    feedContainer.innerHTML = '';
+    posts.forEach(post => {
+        feedContainer.appendChild(compilePostHtmlNode(post));
+    });
+}
+
+function compilePostHtmlNode(post) {
+    const postCard = document.createElement('article');
+    postCard.className = `p-4 hover:bg-slate-50/70 transition cursor-pointer flex space-x-3 transition-all duration-300 post-entry-node`;
+    postCard.id = `ui-post-${post.id}`;
+    
+    // Compute if the post was authored by this specific device session
+    const isAuthor = post.session_id === currentSessionId;
+    // Compute if the post is still inside the legal 5-minute mutable window
+    const minutesSinceCreation = (new Date() - new Date(post.created_at)) / 1000 / 60;
+    const canDelete = isAuthor && minutesSinceCreation < 5;
+
+    const formattedTime = formatTimestampRelative(post.created_at);
+
+    postCard.innerHTML = `
+        <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-lg flex-shrink-0" onclick="event.stopPropagation(); openThreadModal('${post.id}')">👤</div>
+        <div class="flex-1 min-w-0" onclick="openThreadModal('${post.id}')">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-1.5">
+                    <span class="font-bold text-slate-800 text-sm">Anonymous</span>
+                    <span class="text-slate-300 text-xs">•</span>
+                    <span class="text-xs text-slate-400 font-medium">${formattedTime}</span>
+                    <span class="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider scale-90">${post.category}</span>
+                </div>
+                ${canDelete ? `<button class="text-slate-300 hover:text-rose-500 text-xs font-semibold px-2 py-1 transition" onclick="event.stopPropagation(); executePostDeletion('${post.id}')">Delete</button>` : ''}
+            </div>
+            <p class="text-slate-700 text-[15px] leading-normal whitespace-pre-wrap mt-1 break-words">${escapeHtmlMarkup(post.content)}</p>
+            
+            <div class="flex items-center space-x-6 mt-3 text-slate-400 text-xs font-medium">
+                <button class="flex items-center space-x-1.5 hover:text-indigo-600 group transition" onclick="event.stopPropagation(); openThreadModal('${post.id}')">
+                    <span class="text-base group-hover:scale-110 transition">💬</span>
+                    <span>${post.reply_count || 0}</span>
+                </button>
+                <button class="flex items-center space-x-1.5 hover:text-rose-600 group transition" onclick="event.stopPropagation(); togglePostLikeState('${post.id}', this)">
+                    <span class="text-base group-hover:scale-110 transition">❤️</span>
+                    <span class="like-counter-val">${post.likes_count || 0}</span>
+                </button>
+            </div>
+        </div>
+    `;
+    return postCard;
+}
+
+// ==========================================
+// 4. DATA WRITE OPERATIONS (MUTATIONS)
+// ==========================================
+
+async function handlePostSubmit() {
+    const textarea = document.getElementById('post-textarea');
+    const categorySelect = document.getElementById('category-select');
+    const submitBtn = document.getElementById('submit-post-btn');
+    
+    const content = textarea.value.trim();
+    const category = categorySelect.value;
+
+    if (!content || content.length > 280) return;
+
+    // Transition the system interface into a computational state
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Posting...';
+
+    const { error } = await supabase
+        .from('posts')
+        .insert([{ content, category, session_id: currentSessionId }]);
+
+    // Revert user-interface elements to receptive configurations
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Post Anon';
+
+    if (error) {
+        alert('Could not submit anonymous post: ' + error.message);
+        return;
+    }
+
+    // Reset input fields cleanly
+    textarea.value = '';
+    document.getElementById('char-counter').textContent = '0 / 280';
+    
+    // Automatically trigger visual sync across data grids
+    fetchAndRenderFeed();
+}
+
+async function executePostDeletion(postId) {
+    if (!confirm('Are you absolutely sure you want to permanently delete your post?')) return;
+
+    const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId);
+
+    if (error) {
+        alert('Deletion rejected. Your 5-minute ownership window may have expired.');
+        return;
+    }
+
+    // Dynamically clear deleted node from viewport directly
+    const element = document.getElementById(`ui-post-${postId}`);
+    if (element) element.remove();
+    
+    // If the modal was active on that post, close it
+    if (globalActiveFocusedPostId === postId) closeThreadModal();
+}
+
+async function togglePostLikeState(postId, buttonNode) {
+    const countSpan = buttonNode.querySelector('.like-counter-val');
+    let currentCount = parseInt(countSpan.textContent);
+
+    // Optimistically update the UI to make clicks feel instant
+    countSpan.textContent = currentCount + 1;
+    buttonNode.classList.add('text-rose-600');
+
+    // Attempt to register a structural unique row entry into the database layout
+    const { error } = await supabase
+        .from('likes')
+        .insert([{ post_id: postId, session_id: currentSessionId }]);
+
+    if (error) {
+        // If it throws a uniqueness constraint violation error, the user has already liked it
+        if (error.code === '23505') { 
+            // Optimistically update UI count down for the unlike transition
+            countSpan.textContent = Math.max(0, currentCount - 1);
+            buttonNode.classList.remove('text-rose-600');
+
+            // Delete the unique matching like row entry
+            await supabase
+                .from('likes')
+                .delete()
+                .match({ post_id: postId, session_id: currentSessionId });
+        }
+    }
+}
+
+// ==========================================
+// 5. THREAD DISCUSSION SYSTEM (COMMENTS)
+// ==========================================
+
+async function openThreadModal(postId) {
+    globalActiveFocusedPostId = postId;
+    const modal = document.getElementById('thread-modal');
+    const focusBox = document.getElementById('modal-focus-post');
+    
+    modal.classList.remove('hidden');
+    focusBox.innerHTML = `<div class="p-4 text-center text-slate-400 animate-pulse text-sm">Syncing conversation stream...</div>`;
+
+    // Fetch the targeted parent post details securely
+    const { data: post, error } = await supabase.from('posts').select('*').eq('id', postId).single();
+    if (error || !post) {
+        closeThreadModal();
+        return;
+    }
+
+    // Render the focused parent component view inside the modal frame
+    focusBox.innerHTML = `
+        <div class="flex items-center space-x-1.5 text-xs text-slate-400 font-medium mb-1.5">
+            <span class="font-bold text-slate-700">Anonymous Original Poster</span>
+            <span>•</span>
+            <span>${formatTimestampRelative(post.created_at)}</span>
+        </div>
+        <p class="text-slate-800 text-base leading-normal whitespace-pre-wrap break-words">${escapeHtmlMarkup(post.content)}</p>
+        <div class="mt-2 text-xs font-bold text-indigo-500 uppercase tracking-wider bg-indigo-50 px-2 py-0.5 rounded w-fit">${post.category}</div>
+    `;
+
+    fetchAndRenderComments(postId);
+}
+
+async function fetchAndRenderComments(postId) {
+    const commentsContainer = document.getElementById('modal-comments-container');
+    commentsContainer.innerHTML = '';
+
+    const { data: replies, error } = await supabase
+        .from('replies')
+        .select('*')
+        .eq('post_id', postId)
+        .order('created_at', { ascending: true });
+
+    if (error) return;
+
+    if (!replies || replies.length === 0) {
+        commentsContainer.innerHTML = `<div class="p-6 text-center text-sm text-slate-400">Nobody has commented yet. Speak your mind anonymously below!</div>`;
+        return;
+    }
+
+    replies.forEach(reply => {
+        const replyDiv = document.createElement('div');
+        replyDiv.className = "py-3 flex space-x-3 text-sm";
+        replyDiv.innerHTML = `
+            <div class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs flex-shrink-0">👤</div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center space-x-1 text-xs text-slate-400">
+                    <span class="font-bold text-slate-700">Anonymous</span>
+                    <span>•</span>
+                    <span>${formatTimestampRelative(reply.created_at)}</span>
+                </div>
+                <p class="text-slate-700 leading-normal mt-0.5 break-words whitespace-pre-wrap">${escapeHtmlMarkup(reply.content)}</p>
+            </div>
+        `;
+        commentsContainer.appendChild(replyDiv);
+    });
+}
+
+async function handleReplySubmit() {
+    const textarea = document.getElementById('reply-textarea');
+    const submitBtn = document.getElementById('submit-reply-btn');
+    const content = textarea.value.trim();
+
+    if (!content || !globalActiveFocusedPostId || content.length > 280) return;
+
+    submitBtn.disabled = true;
+
+    const { error } = await supabase
+        .from('replies')
+        .insert([{ post_id: globalActiveFocusedPostId, content, session_id: currentSessionId }]);
+
+    submitBtn.disabled = false;
+
+    if (error) {
+        alert('Could not submit reply: ' + error.message);
+        return;
+    }
+
+    textarea.value = '';
+    fetchAndRenderComments(globalActiveFocusedPostId);
+    fetchAndRenderFeed(); // Refreshes primary counter elements in behind layers
+}
+
+function closeThreadModal() {
+    document.getElementById('thread-modal').classList.add('hidden');
+    globalActiveFocusedPostId = null;
+}
+
+// ==========================================
+// 6. FILTER & NAVIGATION ARCHITECTURE
+// ==========================================
+
+function switchFeedTab(tabName) {
+    globalCurrentFeedTab = tabName;
+    document.getElementById('tab-latest').className = `flex-1 py-4 text-center text-slate-500 hover:bg-slate-50 transition font-medium ${tabName === 'latest' ? 'feed-tab-active' : ''}`;
+    document.getElementById('tab-trending').className = `flex-1 py-4 text-center text-slate-500 hover:bg-slate-50 transition font-medium ${tabName === 'trending' ? 'feed-tab-active' : ''}`;
+    fetchAndRenderFeed();
+}
+
+function filterByCategory(categoryName, elementNode) {
+    globalCurrentCategory = categoryName;
+    
+    // Toggle active style across sibling horizontal layout control pills
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.className = "bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn";
+    });
+    elementNode.className = "bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap filter-btn";
+    
+    fetchAndRenderFeed();
+}
+
+// ==========================================
+// 7. REAL-TIME DATA REPLICATION SYNCHRONIZER
+// ==========================================
+
+function initializeRealTimePipeline() {
+    supabase
+        .channel('public-feed-stream')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload) => {
+            // If a brand new post occurs externally, immediately pull updates safely if filtering allows
+            if (payload.eventType === 'INSERT') {
+                if (globalCurrentCategory === 'all' || globalCurrentCategory === payload.new.category) {
+                    // Prepend elements safely to layout top frames if sorting is configured for timeline linear streams
+                    if (globalCurrentFeedTab === 'latest') {
+                        const container = document.getElementById('feed-container');
+                        
+                        // Clear out generic layout informational placeholders if they match
+                        if(container.querySelector('div.text-center')) container.innerHTML = '';
+                        
+                        const newPostNode = compilePostHtmlNode(payload.new);
+                        // Apply flash entry CSS rendering behavior animations
+                        newPostNode.classList.add('bg-indigo-50/70', 'scale-[0.99]');
+                        container.insertBefore(newPostNode, container.firstChild);
+                        
+                        // Slowly ease layout back into natural balancing configurations
+                        setTimeout(() => {
+                            newPostNode.classList.remove('bg-indigo-50/70', 'scale-[0.99]');
+                        }, 1000);
+                    }
+                }
+            } else {
+                // For updates or deletions across relational indexes, perform passive background component refetches
+                fetchAndRenderFeed();
+            }
+        })
+        .subscribe();
+}
+
+// ==========================================
+// 8. SECURITY & UTILITY HELPER MATRIX
+// ==========================================
+
+// Prevents cross-site scripting malicious data attacks (XSS sanitization firewall)
+function escapeHtmlMarkup(stringInput) {
+    const div = document.createElement('div');
+    div.textContent = stringInput;
+    return div.innerHTML;
+}
+
+// Generates dynamic conversational timestamps relative to user device time zones
+function formatTimestampRelative(dateString) {
+    const now = new Date();
+    const past = new Date(dateString);
+    const differenceInMs = now - past;
+    
+    const seconds = Math.floor(differenceInMs / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (seconds < 60) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
+}

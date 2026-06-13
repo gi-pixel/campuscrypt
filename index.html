@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusCrypt — Anonymous Feed</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* Smooth transitions for interactive elements */
+        .feed-tab-active {
+            border-bottom: 4px solid #6366f1;
+            color: #6366f1;
+            font-weight: 600;
+        }
+        /* Custom hide scrollbar rule for feed cleanliness */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen">
+
+    <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-4 min-h-screen">
+        
+        <aside class="hidden md:flex flex-col col-span-1 p-6 border-r border-slate-200 sticky top-0 h-screen justify-between">
+            <div class="space-y-6">
+                <div class="flex items-center space-x-2 text-indigo-600 font-black text-2xl tracking-tight cursor-pointer" onclick="window.location.reload()">
+                    <span>🥷</span>
+                    <span>CampusCrypt</span>
+                </div>
+                <nav class="space-y-2">
+                    <button class="w-full flex items-center space-x-3 px-4 py-3 text-lg font-bold text-indigo-600 bg-indigo-50 rounded-full transition">
+                        <span>🏠</span> <span>Feed</span>
+                    </button>
+                    <a href="https://supabase.com" target="_blank" class="w-full flex items-center space-x-3 px-4 py-3 text-lg font-medium text-slate-600 hover:bg-slate-100 rounded-full transition">
+                        <span>⚡</span> <span>Backend</span>
+                    </a>
+                </nav>
+            </div>
+            <div class="p-3 bg-slate-100 rounded-xl text-center">
+                <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Your Local ID</p>
+                <p id="local-session-badge" class="text-xs font-mono text-indigo-600 font-semibold truncate mt-1">Checking...</p>
+            </div>
+        </aside>
+
+        <main class="col-span-1 md:col-span-3 min-h-screen border-r border-slate-200 bg-white">
+            
+            <header class="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-200 z-10">
+                <div class="flex items-center justify-between p-4 md:hidden">
+                    <span class="text-indigo-600 font-black text-xl tracking-tight">🥷 CampusCrypt</span>
+                    <span id="mobile-session-badge" class="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded">...</span>
+                </div>
+                
+                <div class="flex border-t border-slate-100 md:border-t-0">
+                    <button id="tab-latest" class="flex-1 py-4 text-center text-slate-500 hover:bg-slate-50 transition font-medium feed-tab-active" onclick="switchFeedTab('latest')">
+                        Latest
+                    </button>
+                    <button id="tab-trending" class="flex-1 py-4 text-center text-slate-500 hover:bg-slate-50 transition font-medium" onclick="switchFeedTab('trending')">
+                        🔥 Trending
+                    </button>
+                </div>
+            </header>
+
+            <section class="p-4 border-b border-slate-100 bg-white">
+                <div class="flex items-start space-x-3">
+                    <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-lg flex-shrink-0">
+                        👤
+                    </div>
+                    <div class="flex-1">
+                        <textarea id="post-textarea" maxlength="280" rows="3" class="w-full text-lg border-none focus:ring-0 resize-none outline-none placeholder-slate-400 py-1" placeholder="What's happening on campus? (Max 280 chars)"></textarea>
+                        
+                        <div class="text-right text-xs text-slate-400 mb-3" id="char-counter">0 / 280</div>
+                        
+                        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                            <div class="flex items-center space-x-2">
+                                <label for="category-select" class="text-xs font-bold text-slate-500 uppercase tracking-wider">Category:</label>
+                                <select id="category-select" class="bg-slate-100 text-slate-700 text-sm rounded-lg px-3 py-1.5 font-medium border-none focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+                                    <option value="general">🌐 General</option>
+                                    <option value="cs101">💻 CS101</option>
+                                    <option value="math201">📐 MATH201</option>
+                                    <option value="professor">🧑‍🏫 Professor</option>
+                                    <option value="campus">🏫 Campus</option>
+                                </select>
+                            </div>
+                            
+                            <button id="submit-post-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-full font-bold transition shadow-sm disabled:opacity-50" onclick="handlePostSubmit()">
+                                Post Anon
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="flex items-center space-x-2 p-3 bg-slate-50 overflow-x-auto no-scrollbar border-b border-slate-100">
+                <button class="bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap filter-btn" onclick="filterByCategory('all', this)">All Feed</button>
+                <button class="bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn" onclick="filterByCategory('general', this)">🌐 General</button>
+                <button class="bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn" onclick="filterByCategory('cs101', this)">💻 CS101</button>
+                <button class="bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn" onclick="filterByCategory('math201', this)">📐 MATH201</button>
+                <button class="bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn" onclick="filterByCategory('professor', this)">🧑‍🏫 Professor</button>
+                <button class="bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn" onclick="filterByCategory('campus', this)">🏫 Campus</button>
+            </div>
+
+            <div id="feed-container" class="divide-y divide-slate-100">
+                <div class="p-4 animate-pulse space-y-3">
+                    <div class="flex space-x-3">
+                        <div class="rounded-full bg-slate-200 h-10 w-10"></div>
+                        <div class="flex-1 space-y-2 py-1">
+                            <div class="h-2 bg-slate-200 rounded w-1/4"></div>
+                            <div class="h-2 bg-slate-200 rounded w-3/4"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="feed-end" class="p-6 text-center text-sm text-slate-400 font-medium bg-slate-50">
+                Syncing directly with campus database...
+            </div>
+        </main>
+    </div>
+
+    <div id="thread-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4 hidden">
+        <div class="bg-white w-full max-w-2xl rounded-t-2xl md:rounded-2xl max-h-[90vh] md:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            <div class="p-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white">
+                <h3 class="font-bold text-lg text-slate-800">Anonymous Discussion</h3>
+                <button class="text-slate-400 hover:text-slate-600 text-2xl p-1" onclick="closeThreadModal()">✕</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+                <div id="modal-focus-post" class="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100/50"></div>
+                
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">Comments</div>
+                
+                <div id="modal-comments-container" class="space-y-3 divide-y divide-slate-50"></div>
+            </div>
+
+            <div class="p-4 border-t border-slate-200 bg-slate-50">
+                <div class="flex items-end space-x-2">
+                    <textarea id="reply-textarea" maxlength="280" rows="2" class="flex-1 bg-white border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none outline-none placeholder-slate-400" placeholder="Type an anonymous reply..."></textarea>
+                    <button id="submit-reply-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2.5 rounded-xl font-bold transition shadow-sm h-fit" onclick="handleReplySubmit()">
+                        Reply
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        // Character counter implementation for UX comfort
+        const tx = document.getElementById('post-textarea');
+        const counter = document.getElementById('char-counter');
+        tx.addEventListener('input', () => {
+            counter.textContent = `${tx.value.length} / 280`;
+            if (tx.value.length >= 260) {
+                counter.className = "text-right text-xs text-rose-500 font-bold mb-3";
+            } else {
+                counter.className = "text-right text-xs text-slate-400 mb-3";
+            }
+        });
+    </script>
+</body>
+</html>
