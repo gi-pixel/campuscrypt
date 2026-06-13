@@ -1,156 +1,532 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CampusCrypt — Anonymous Feed</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        /* Smooth transitions for interactive elements */
-        .feed-tab-active {
-            border-bottom: 4px solid #6366f1;
-            color: #6366f1;
-            font-weight: 600;
-        }
-        /* Custom hide scrollbar rule for feed cleanliness */
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CampusCrypt — Anonymous Feed</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      background: #000;
+      color: white;
+      display: flex;
+      justify-content: center;
+      min-h: 100vh;
+    }
+
+    .twitter {
+      width: 100%;
+      max-width: 430px;
+      min-height: 100vh;
+      background: #000;
+      border-left: 1px solid #222;
+      border-right: 1px solid #222;
+      padding-bottom: 65px; /* Leave room for sticky bottom nav */
+    }
+
+    /* HEADER */
+    .top-bar {
+      position: sticky;
+      top: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-blur: md;
+      padding: 14px 14px 0 14px;
+      border-bottom: 1px solid #222;
+      z-index: 100;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      background: #16181c;
+      border-radius: 30px;
+      padding: 12px 16px;
+      color: #777;
+      font-size: 16px;
+      justify-content: space-between;
+    }
+
+    .search-box div {
+      display: flex;
+      align-items: center;
+    }
+
+    .search-box i {
+      margin-right: 10px;
+    }
+
+    .session-badge {
+      font-family: monospace;
+      font-size: 11px;
+      color: #1d9bf0;
+      background: rgba(29, 155, 240, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* TABS */
+    .tabs {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 14px;
+      font-size: 15px;
+      font-weight: bold;
+      color: #777;
+    }
+
+    .tabs div {
+      cursor: pointer;
+      padding-bottom: 10px;
+      width: 100%;
+      text-align: center;
+      transition: 0.2s;
+    }
+
+    .tabs .active {
+      color: white;
+      position: relative;
+    }
+
+    .tabs .active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 25%;
+      width: 50%;
+      height: 4px;
+      border-radius: 10px;
+      background: #1d9bf0;
+    }
+
+    /* COMPOSER DRAWER PANEL */
+    .composer-panel {
+      padding: 16px;
+      border-bottom: 1px solid #222;
+      background: #000;
+    }
+
+    .composer-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .composer-content {
+      width: 100%;
+    }
+
+    .composer-panel textarea {
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: white;
+      font-size: 18px;
+      resize: none;
+      margin-bottom: 8px;
+    }
+
+    .composer-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid #111;
+      padding-top: 12px;
+    }
+
+    .composer-panel select {
+      background: #16181c;
+      color: #71767b;
+      border: 1px solid #222;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .char-counter {
+      color: #71767b;
+      font-size: 12px;
+      margin-right: 12px;
+    }
+
+    .post-btn {
+      background: #1d9bf0;
+      color: white;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .post-btn:disabled {
+      opacity: 0.5;
+    }
+
+    /* CATEGORY TRACK HORIZONTAL FILTER */
+    .category-bar {
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      background: #050505;
+      overflow-x: auto;
+      border-bottom: 1px solid #222;
+    }
+    .category-bar::-webkit-scrollbar { display: none; }
+
+    .cat-pill {
+      background: #16181c;
+      color: #71767b;
+      border: 1px solid #222;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .cat-pill.active {
+      background: #fff;
+      color: #000;
+      border-color: #fff;
+    }
+
+    /* DYNAMIC FEED NODES */
+    .tweet {
+      display: flex;
+      gap: 12px;
+      padding: 16px;
+      border-bottom: 1px solid #222;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .tweet:hover {
+      background: #080808;
+    }
+
+    .avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #222;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .tweet-content {
+      width: 100%;
+    }
+
+    .tweet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .header-meta-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .name {
+      font-weight: bold;
+      font-size: 15px;
+    }
+
+    .handle, .time {
+      color: #71767b;
+      font-size: 14px;
+    }
+
+    .cat-badge {
+      font-size: 10px;
+      background: #222;
+      color: #71767b;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+
+    .delete-btn {
+      background: transparent;
+      border: none;
+      color: #71767b;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .delete-btn:hover { color: #f91880; }
+
+    .tweet-text {
+      font-size: 16px;
+      line-height: 1.4;
+      margin-bottom: 12px;
+      white-space: pre-wrap;
+      break-words: break-all;
+    }
+
+    /* ACTIONS MAP */
+    .actions {
+      display: flex;
+      gap: 45px;
+      color: #71767b;
+      font-size: 14px;
+    }
+
+    .action {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .action:hover { color: #1d9bf0; }
+    .action.liked { color: #f91880 !important; }
+    .action.liked i { font-weight: 900; }
+
+    /* DISCUSSION THREAD OVERLAY MODAL */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(91, 112, 131, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 14px;
+    }
+    .modal-overlay.hidden { display: none !important; }
+
+    .modal-box {
+      background: #000;
+      width: 100%;
+      max-width: 450px;
+      border-radius: 16px;
+      border: 1px solid #222;
+      max-height: 80vh;
+      display: flex;
+      flex-col: column;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 14px;
+      border-bottom: 1px solid #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .modal-scroll {
+      padding: 16px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    #modal-focus-post {
+      border-bottom: 1px solid #222;
+      padding-bottom: 16px;
+      margin-bottom: 16px;
+    }
+
+    .reply-node {
+      display: flex;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #111;
+    }
+
+    .modal-footer-input {
+      padding: 14px;
+      border-top: 1px solid #222;
+      background: #050505;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .modal-footer-input textarea {
+      flex: 1;
+      background: #16181c;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 10px;
+      color: white;
+      resize: none;
+      outline: none;
+      font-size: 14px;
+    }
+
+    /* FIXED LAYOUT ITEMS */
+    .float-btn {
+      position: fixed;
+      bottom: 74px;
+      right: 24px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #1d9bf0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 22px;
+      color: white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      cursor: pointer;
+      z-index: 99;
+    }
+
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      max-width: 430px;
+      background: #000;
+      border-top: 1px solid #222;
+      display: flex;
+      justify-content: space-around;
+      padding: 16px 0;
+      font-size: 22px;
+      z-index: 100;
+    }
+
+    .bottom-nav i {
+      color: white;
+      cursor: pointer;
+    }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen">
+<body>
 
-    <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-4 min-h-screen">
-        
-        <aside class="hidden md:flex flex-col col-span-1 p-6 border-r border-slate-200 sticky top-0 h-screen justify-between">
-            <div class="space-y-6">
-                <div class="flex items-center space-x-2 text-indigo-600 font-black text-2xl tracking-tight cursor-pointer" onclick="window.location.reload()">
-                    <span>CampusCrypt</span>
-                </div>
-            </div>
-            <div class="p-3 bg-slate-100 rounded-xl text-center">
-                <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Your Local ID</p>
-                <p id="local-session-badge" class="text-xs font-mono text-indigo-600 font-semibold truncate mt-1">Checking...</p>
-            </div>
-        </aside>
+  <div class="twitter">
 
-        <main class="col-span-1 md:col-span-3 min-h-screen border-r border-slate-200 bg-white">
-            
-            <header class="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-200 z-10">
-                <div class="flex items-center justify-between p-4 md:hidden">
-                    <span class="text-indigo-600 font-black text-xl tracking-tight">🥷 CampusCrypt</span>
-                    <span id="mobile-session-badge" class="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded">...</span>
-                </div>
-                
-                <div class="flex border-t border-slate-100 md:border-t-0">
-                    <button id="tab-latest" class="flex-1 py-4 text-center text-slate-500 hover:bg-slate-50 transition font-medium feed-tab-active" onclick="switchFeedTab('latest')">
-                        Latest
-                    </button>
-                    <button id="tab-trending" class="flex-1 py-4 text-center text-slate-500 hover:bg-slate-50 transition font-medium" onclick="switchFeedTab('trending')">
-                        Trending
-                    </button>
-                </div>
-            </header>
-
-            <section class="p-4 border-b border-slate-100 bg-white">
-                <div class="flex items-start space-x-3">
-                    <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-lg flex-shrink-0">
-                        👤
-                    </div>
-                    <div class="flex-1">
-                        <textarea id="post-textarea" maxlength="280" rows="3" class="w-full text-lg border-none focus:ring-0 resize-none outline-none placeholder-slate-400 py-1" placeholder="What's happening on campus? (Max 280 chars)"></textarea>
-                        
-                        <div class="text-right text-xs text-slate-400 mb-3" id="char-counter">0 / 280</div>
-                        
-                        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
-                            <div class="flex items-center space-x-2">
-                                <label for="category-select" class="text-xs font-bold text-slate-500 uppercase tracking-wider">Category:</label>
-                                <select id="category-select" class="bg-slate-100 text-slate-700 text-sm rounded-lg px-3 py-1.5 font-medium border-none focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
-                                    <option value="general">General</option>
-                                    <option value="cs101">CS101</option>
-                                    <option value="math201">MATH201</option>
-                                    <option value="professor">Professor</option>
-                                    <option value="campus">Campus</option>
-                                </select>
-                            </div>
-                            
-                            <button id="submit-post-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-full font-bold transition shadow-sm disabled:opacity-50" onclick="handlePostSubmit()">
-                                Post Anon
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <div class="flex items-center space-x-2 p-3 bg-slate-50 overflow-x-auto no-scrollbar border-b border-slate-100">
-                <button class="bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap filter-btn" onclick="filterByCategory('all', this)">All Feed</button>
-                <button class="bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn" onclick="filterByCategory('general', this)">🌐 General</button>
-                <button class="bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn" onclick="filterByCategory('cs101', this)">💻 CS101</button>
-                <button class="bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn" onclick="filterByCategory('math201', this)">📐 MATH201</button>
-                <button class="bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn" onclick="filterByCategory('professor', this)">🧑‍🏫 Professor</button>
-                <button class="bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn" onclick="filterByCategory('campus', this)">🏫 Campus</button>
-            </div>
-
-            <div id="feed-container" class="divide-y divide-slate-100">
-                <div class="p-4 animate-pulse space-y-3">
-                    <div class="flex space-x-3">
-                        <div class="rounded-full bg-slate-200 h-10 w-10"></div>
-                        <div class="flex-1 space-y-2 py-1">
-                            <div class="h-2 bg-slate-200 rounded w-1/4"></div>
-                            <div class="h-2 bg-slate-200 rounded w-3/4"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="feed-end" class="p-6 text-center text-sm text-slate-400 font-medium bg-slate-50">
-                Syncing directly with campus database...
-            </div>
-        </main>
-    </div>
-
-    <div id="thread-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4 hidden">
-        <div class="bg-white w-full max-w-2xl rounded-t-2xl md:rounded-2xl max-h-[90vh] md:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-            
-            <div class="p-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white">
-                <h3 class="font-bold text-lg text-slate-800">Anonymous Discussion</h3>
-                <button class="text-slate-400 hover:text-slate-600 text-2xl p-1" onclick="closeThreadModal()">✕</button>
-            </div>
-
-            <div class="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
-                <div id="modal-focus-post" class="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100/50"></div>
-                
-                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">Comments</div>
-                
-                <div id="modal-comments-container" class="space-y-3 divide-y divide-slate-50"></div>
-            </div>
-
-            <div class="p-4 border-t border-slate-200 bg-slate-50">
-                <div class="flex items-end space-x-2">
-                    <textarea id="reply-textarea" maxlength="280" rows="2" class="flex-1 bg-white border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none outline-none placeholder-slate-400" placeholder="Type an anonymous reply..."></textarea>
-                    <button id="submit-reply-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2.5 rounded-xl font-bold transition shadow-sm h-fit" onclick="handleReplySubmit()">
-                        Reply
-                    </button>
-                </div>
-            </div>
+    <div class="top-bar">
+      <div class="search-box">
+        <div>
+          <i class="fa-solid fa-user-secret" style="color: #1d9bf0; margin-right: 8px;"></i>
+          <span style="font-weight: bold; color: white;">CampusCrypt</span>
         </div>
+        <span id="local-session-badge" class="session-badge">Syncing...</span>
+      </div>
+
+      <div class="tabs">
+        <div id="tab-latest" class="active" onclick="switchFeedTab('latest')">Latest</div>
+        <div id="tab-trending" onclick="switchFeedTab('trending')">🔥 Trending</div>
+      </div>
     </div>
 
-    <script src="app.js"></script>
-    <script>
-        // Inline UX script for interactive character count rendering
-        const tx = document.getElementById('post-textarea');
-        const counter = document.getElementById('char-counter');
-        if (tx && counter) {
-            tx.addEventListener('input', () => {
-                counter.textContent = `${tx.value.length} / 280`;
-                if (tx.value.length >= 260) {
-                    counter.className = "text-right text-xs text-rose-500 font-bold mb-3";
-                } else {
-                    counter.className = "text-right text-xs text-slate-400 mb-3";
-                }
-            });
-        }
-    </script>
+    <section class="composer-panel">
+      <div class="composer-row">
+        <div class="avatar">🥷</div>
+        <div class="composer-content">
+          <textarea id="post-textarea" maxlength="280" rows="3" placeholder="What's happening on campus anonymously?"></textarea>
+          <div class="composer-meta">
+            <div>
+              <select id="category-select">
+                <option value="general">🌐 General</option>
+                <option value="cs101">💻 CS101</option>
+                <option value="math201">📐 MATH201</option>
+                <option value="professor">🧑‍🏫 Professor</option>
+                <option value="campus">🏫 Campus</option>
+              </select>
+            </div>
+            <div>
+              <span id="char-counter" class="char-counter">0 / 280</span>
+              <button id="submit-post-btn" class="post-btn" onclick="handlePostSubmit()">Post Anon</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="category-bar">
+      <div class="cat-pill active" onclick="filterByCategory('all', this)">All Feed</div>
+      <div class="cat-pill" onclick="filterByCategory('general', this)">🌐 General</div>
+      <div class="cat-pill" onclick="filterByCategory('cs101', this)">💻 CS101</div>
+      <div class="cat-pill" onclick="filterByCategory('math201', this)">📐 MATH201</div>
+      <div class="cat-pill" onclick="filterByCategory('professor', this)">🧑‍🏫 Professor</div>
+      <div class="cat-pill" onclick="filterByCategory('campus', this)">🏫 Campus</div>
+    </div>
+
+    <div id="feed-container">
+      <div style="padding: 30px; text-align: center; color: #71767b;">
+        <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 24px; color: #1d9bf0;"></i>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="float-btn" onclick="document.getElementById('post-textarea').focus()">
+    <i class="fa-solid fa-feather-pointed"></i>
+  </div>
+
+  <div class="bottom-nav">
+    <i class="fa-solid fa-house" onclick="window.location.reload()"></i>
+    <i class="fa-solid fa-magnifying-glass" onclick="document.getElementById('post-textarea').focus()"></i>
+    <i class="fa-regular fa-bell" onclick="alert('Notifications coming soon!')"></i>
+    <i class="fa-regular fa-envelope" onclick="alert('Encrypted direct messaging alpha test next week.')"></i>
+  </div>
+
+  <div id="thread-modal" class="modal-overlay hidden" onclick="closeThreadModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span style="font-weight: bold;">Thread Discussion</span>
+        <button class="modal-close" onclick="closeThreadModal()">✕</button>
+      </div>
+      <div class="modal-scroll">
+        <div id="modal-focus-post"></div>
+        <div style="font-size: 13px; font-weight: bold; color: #71767b; margin-bottom: 10px; text-transform: uppercase;">Replies</div>
+        <div id="modal-comments-container"></div>
+      </div>
+      <div class="modal-footer-input">
+        <textarea id="reply-textarea" maxlength="280" rows="2" placeholder="Post your anonymous reply..."></textarea>
+        <button id="submit-reply-btn" class="post-btn" onclick="handleReplySubmit()">Reply</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    // Inline Character Counter feedback logic
+    const txtArea = document.getElementById('post-textarea');
+    const cnt = document.getElementById('char-counter');
+    if (txtArea && cnt) {
+      txtArea.addEventListener('input', () => {
+        cnt.textContent = `${txtArea.value.length} / 280`;
+        cnt.style.color = txtArea.value.length >= 260 ? '#f91880' : '#71767b';
+      });
+    }
+  </script>
 </body>
 </html>
