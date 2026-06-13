@@ -3,7 +3,7 @@
 // ==========================================
 
 // Replace these values with your actual credentials from your Supabase Project Settings
-const SUPABASE_URL = 'https://xtqfbaqckgodxmsnyexh.supabase.co/rest/v1/';
+const SUPABASE_URL = 'https://xtqfbaqckgodxmsnyexh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0cWZiYXFja2dvZHhtc255ZXhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTgwODIsImV4cCI6MjA5Njg3NDA4Mn0.cWsx_9gyk3m9Dz6ZMn_8qHQ0s_20qiNvJTUn8Q0p3uM';
 
 // Automatically resolve or generate a unique tracking session ID for this browser
