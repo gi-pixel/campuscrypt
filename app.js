@@ -25,9 +25,18 @@ let globalCurrentFeedTab = 'latest';
 let globalCurrentCategory = 'all';       
 let globalActiveFocusedPostId = null;   
 
+// Mount engine initialization handlers and trigger welcome splash screen
 window.addEventListener('DOMContentLoaded', () => {
     fetchAndRenderFeed();
     initializeRealTimePipeline();
+
+    // NEW: Handles the automatic fade out of the welcome intro animation
+    setTimeout(() => {
+        const splash = document.getElementById('splash-layer');
+        if (splash) {
+            splash.classList.add('fade-out');
+        }
+    }, 2000); // 2000 milliseconds = 2 seconds of pure intro vibe
 });
 
 // ==========================================
@@ -47,27 +56,29 @@ function closeComposerModal() {
     if (modal) modal.classList.add('hidden');
 }
 
-// ==========================================
-// 3. DATA READ STREAMING PIPELINES
-// ==========================================
 
+// ==========================================
+// COHESIVE TIMELINE RENDER ENGINE (WITH TRENDING ALGORITHM)
+// ==========================================
 async function fetchAndRenderFeed() {
     const feedContainer = document.getElementById('feed-container');
     if (!feedContainer) return;
     
     let query = supabaseClient.from('posts').select('*');
 
+    // Filter by active category pill selection
     if (globalCurrentCategory !== 'all') {
         query = query.eq('category', globalCurrentCategory);
     }
 
+    // Always fetch latest rows first to calculate metrics on recent activity
     query = query.order('created_at', { ascending: false });
 
-    const { data: posts, error } = await query.limit(20);
+    const { data: posts, error } = await query.limit(40); // Pull slightly more rows to compute trends
 
     if (error) {
         console.error('Database Connection Error:', error.message);
-        feedContainer.innerHTML = `<div style="padding:20px; text-align:center; color:#f91880;">Database Sync Failed. Check API configuration keys.</div>`;
+        feedContainer.innerHTML = `<div style="padding:20px; text-align:center; color:#f91880;">Database Sync Failed. Check API keys.</div>`;
         return;
     }
 
@@ -76,8 +87,8 @@ async function fetchAndRenderFeed() {
         return;
     }
 
-    feedContainer.innerHTML = '';
-
+    // Map through posts to inject live structural metrics
+    const compiledPosts = [];
     for (const post of posts) {
         const { count: likesCount } = await supabaseClient
             .from('likes')
@@ -99,9 +110,23 @@ async function fetchAndRenderFeed() {
         post.likes_count = likesCount || 0;
         post.reply_count = repliesCount || 0;
         post.has_user_liked = !!userLiked;
+        
+        // MATHEMATICAL RANKING ENGINE: 1 Like = 1 point, 1 Comment = 2 points
+        post.trending_score = post.likes_count + (post.reply_count * 2);
 
-        feedContainer.appendChild(compilePostHtmlNode(post));
+        compiledPosts.push(post);
     }
+
+    // NEW: If the user is viewing Trending, sort by engagement score descending
+    if (globalCurrentFeedTab === 'trending') {
+        compiledPosts.sort((a, b) => b.trending_score - a.trending_score);
+    }
+
+    // Clear loading states and render the sorted array list
+    feedContainer.innerHTML = '';
+    compiledPosts.forEach(post => {
+        feedContainer.appendChild(compilePostHtmlNode(post));
+    });
 }
 
 function compilePostHtmlNode(post) {
