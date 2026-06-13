@@ -179,22 +179,51 @@ async function togglePostLikeState(postId, buttonNode) {
     const countSpan = buttonNode.querySelector('.like-counter-val');
     let currentCount = parseInt(countSpan.textContent);
 
-    countSpan.textContent = currentCount + 1;
-    buttonNode.classList.add('text-rose-600');
-
-    const { error } = await supabaseClient
+    // 1. Check if this device session has already liked this post
+    const { data: existingLike, error: checkError } = await supabaseClient
         .from('likes')
-        .insert([{ post_id: postId, session_id: currentSessionId }]);
+        .select('id')
+        .eq('post_id', postId)
+        .eq('session_id', currentSessionId)
+        .maybeSingle();
 
-    if (error) {
-        if (error.code === '23505') { 
-            countSpan.textContent = Math.max(0, currentCount - 1);
+    if (checkError) {
+        console.error("Error checking like state:", checkError.message);
+        return;
+    }
+
+    if (existingLike) {
+        // 2. UNLIKE OPERATION: Row exists, so delete it
+        // Optimistically drop UI feedback instantly
+        countSpan.textContent = Math.max(0, currentCount - 1);
+        buttonNode.classList.remove('text-rose-600');
+
+        const { error: deleteError } = await supabaseClient
+            .from('likes')
+            .delete()
+            .match({ post_id: postId, session_id: currentSessionId });
+
+        if (deleteError) {
+            // Revert back if database fails network request
+            countSpan.textContent = currentCount;
+            buttonNode.classList.add('text-rose-600');
+            console.error("Unlike transaction failed:", deleteError.message);
+        }
+    } else {
+        // 3. LIKE OPERATION: No row exists, insert a brand new one
+        // Optimistically increment UI feedback instantly
+        countSpan.textContent = currentCount + 1;
+        buttonNode.classList.add('text-rose-600');
+
+        const { error: insertError } = await supabaseClient
+            .from('likes')
+            .insert([{ post_id: postId, session_id: currentSessionId }]);
+
+        if (insertError) {
+            // Revert back if database validation fails
+            countSpan.textContent = currentCount;
             buttonNode.classList.remove('text-rose-600');
-
-            await supabaseClient
-                .from('likes')
-                .delete()
-                .match({ post_id: postId, session_id: currentSessionId });
+            console.error("Like transaction failed:", insertError.message);
         }
     }
 }
@@ -286,8 +315,12 @@ async function handleReplySubmit() {
     }
 
     textarea.value = '';
-    fetchAndRenderComments(globalActiveFocusedPostId);
-    fetchAndRenderFeed(); 
+    
+    // Refresh the comments list inside the modal overlay view
+    await fetchAndRenderComments(globalActiveFocusedPostId);
+    
+    // FIX: Force the primary background timeline stream to pull updated counter numbers
+    await fetchAndRenderFeed(); 
 }
 
 function closeThreadModal() {
