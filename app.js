@@ -46,17 +46,15 @@ window.addEventListener('DOMContentLoaded', () => {
 async function fetchAndRenderFeed() {
     const feedContainer = document.getElementById('feed-container');
     
+    // 1. Fetch the primary posts list
     let query = supabaseClient.from('posts').select('*');
 
     if (globalCurrentCategory !== 'all') {
         query = query.eq('category', globalCurrentCategory);
     }
 
-    if (globalCurrentFeedTab === 'trending') {
-        query = query.order('likes_count', { ascending: false }).order('created_at', { ascending: false });
-    } else {
-        query = query.order('created_at', { ascending: false });
-    }
+    // Default sort by timeline creation order
+    query = query.order('created_at', { ascending: false });
 
     const { data: posts, error } = await query.limit(20);
 
@@ -76,9 +74,38 @@ async function fetchAndRenderFeed() {
     }
 
     feedContainer.innerHTML = '';
-    posts.forEach(post => {
+
+    // 2. Loop through each post and dynamically fetch exact like/reply counts
+    for (const post of posts) {
+        
+        // Fetch real count from 'likes' table
+        const { count: realLikes, error: likeErr } = await supabaseClient
+            .from('likes')
+            .select('*', { count: 'exact', head: true })
+            .eq('post_id', post.id);
+
+        // Fetch real count from 'replies' table
+        const { count: realReplies, error: replyErr } = await supabaseClient
+            .from('replies')
+            .select('*', { count: 'exact', head: true })
+            .eq('post_id', post.id);
+
+        // Check if this specific device liked the post to color the heart red
+        const { data: userLiked } = await supabaseClient
+            .from('likes')
+            .select('id')
+            .eq('post_id', post.id)
+            .eq('session_id', currentSessionId)
+            .maybeSingle();
+
+        // Assign the accurate database counts to our post object
+        post.likes_count = realLikes || 0;
+        post.reply_count = realReplies || 0;
+        post.has_user_liked = !!userLiked;
+
+        // Build and append the node to the feed
         feedContainer.appendChild(compilePostHtmlNode(post));
-    });
+    }
 }
 
 function compilePostHtmlNode(post) {
