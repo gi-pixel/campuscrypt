@@ -2,162 +2,994 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CampusCrypt — Anonymous Feed</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>CampusCrypt — X</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* Smooth transitions for interactive elements */
-        .feed-tab-active {
-            border-bottom: 4px solid #6366f1;
-            color: #6366f1;
-            font-weight: 600;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        /* Custom hide scrollbar rule for feed cleanliness */
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.3;
+        }
+
+        /* X-style layout */
+        .app {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 275px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            padding: 0.5rem;
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: 800;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            display: inline-block;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem;
+            margin: 0.25rem 0;
+            border-radius: 9999px;
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: #e7e9ea;
+            transition: background 0.2s;
+            cursor: pointer;
+            width: fit-content;
+        }
+
+        .nav-item:hover {
+            background: rgba(239, 243, 244, 0.1);
+        }
+
+        .nav-icon {
+            font-size: 1.5rem;
+            width: 1.75rem;
+        }
+
+        .session-badge {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+            right: 1rem;
+            padding: 0.75rem;
+            background: rgba(239, 243, 244, 0.05);
+            border-radius: 1rem;
+            font-size: 0.7rem;
+            color: #71767b;
+            text-align: center;
+        }
+
+        /* Main Feed */
+        .feed {
+            flex: 1;
+            max-width: 600px;
+            border-left: 1px solid #2f3336;
+            border-right: 1px solid #2f3336;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .feed-header {
+            position: sticky;
+            top: 0;
+            background: rgba(0, 0, 0, 0.98);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid #2f3336;
+            padding: 0.75rem 1rem;
+            z-index: 10;
+        }
+
+        .feed-header h2 {
+            font-size: 1.25rem;
+            font-weight: 800;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #2f3336;
+        }
+
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 1rem;
+            font-weight: 500;
+            color: #71767b;
+            cursor: pointer;
+            transition: background 0.2s;
+            position: relative;
+        }
+
+        .tab:hover {
+            background: rgba(239, 243, 244, 0.1);
+        }
+
+        .tab.active {
+            color: #e7e9ea;
+            font-weight: 700;
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 25%;
+            width: 50%;
+            height: 4px;
+            background: #1d9bf0;
+            border-radius: 9999px;
+        }
+
+        /* Compose Box */
+        .compose {
+            padding: 1rem;
+            border-bottom: 1px solid #2f3336;
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            background: #2f3336;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .compose-input {
+            flex: 1;
+        }
+
+        .compose-input textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            font-size: 1.25rem;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+            padding: 0.5rem 0;
+            min-height: 80px;
+            color: #e7e9ea;
+        }
+
+        .compose-input textarea::placeholder {
+            color: #71767b;
+        }
+
+        .compose-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0.5rem;
+        }
+
+        .category-select {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .category-chip {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: transparent;
+            color: #71767b;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid #2f3336;
+        }
+
+        .category-chip:hover {
+            background: rgba(239, 243, 244, 0.1);
+        }
+
+        .category-chip.active {
+            background: #1d9bf0;
+            color: white;
+            border-color: #1d9bf0;
+        }
+
+        .char-count {
+            font-size: 0.75rem;
+            color: #71767b;
+        }
+
+        .char-count.warning {
+            color: #f4212e;
+        }
+
+        .post-btn {
+            background: #1d9bf0;
+            color: white;
+            border: none;
+            border-radius: 9999px;
+            padding: 0.5rem 1rem;
+            font-weight: 700;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .post-btn:hover {
+            background: #1a8cd8;
+        }
+
+        .post-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Filters Row */
+        .filters {
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid #2f3336;
+            display: flex;
+            gap: 0.5rem;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .filters::-webkit-scrollbar {
+            display: none;
+        }
+
+        .filter-chip {
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            background: transparent;
+            color: #71767b;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+            border: 1px solid #2f3336;
+        }
+
+        .filter-chip:hover {
+            background: rgba(239, 243, 244, 0.1);
+        }
+
+        .filter-chip.active {
+            background: #1d9bf0;
+            color: white;
+            border-color: #1d9bf0;
+        }
+
+        /* Tweet / Post Card */
+        .post {
+            padding: 1rem;
+            border-bottom: 1px solid #2f3336;
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+
+        .post:hover {
+            background: rgba(239, 243, 244, 0.03);
+        }
+
+        .post-header {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .post-avatar {
+            width: 40px;
+            height: 40px;
+            background: #2f3336;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .post-content {
+            flex: 1;
+        }
+
+        .post-meta {
+            display: flex;
+            align-items: baseline;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.25rem;
+        }
+
+        .post-name {
+            font-weight: 700;
+            color: #e7e9ea;
+        }
+
+        .post-badge {
+            font-size: 0.75rem;
+            color: #71767b;
+        }
+
+        .post-time {
+            font-size: 0.75rem;
+            color: #71767b;
+        }
+
+        .post-text {
+            font-size: 0.9375rem;
+            margin-bottom: 0.75rem;
+            line-height: 1.4;
+            color: #e7e9ea;
+        }
+
+        .post-category {
+            display: inline-block;
+            font-size: 0.7rem;
+            padding: 0.125rem 0.5rem;
+            border-radius: 9999px;
+            background: rgba(239, 243, 244, 0.1);
+            color: #71767b;
+            margin-bottom: 0.5rem;
+        }
+
+        .post-actions {
+            display: flex;
+            gap: 2rem;
+            margin-top: 0.5rem;
+        }
+
+        .action-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #71767b;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .action-btn:hover {
+            color: #1d9bf0;
+        }
+
+        .action-btn.liked {
+            color: #f91880;
+        }
+
+        /* Modal */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+
+        .modal-content {
+            background: #000000;
+            border: 1px solid #2f3336;
+            border-radius: 1rem;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 1rem;
+            border-bottom: 1px solid #2f3336;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: #000000;
+        }
+
+        .modal-header h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #e7e9ea;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #71767b;
+        }
+
+        .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .reply-input {
+            display: flex;
+            gap: 0.75rem;
+            padding: 1rem;
+            border-top: 1px solid #2f3336;
+        }
+
+        .reply-input textarea {
+            flex: 1;
+            background: transparent;
+            border: 1px solid #2f3336;
+            border-radius: 1rem;
+            padding: 0.75rem;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+            color: #e7e9ea;
+        }
+
+        .reply-input textarea::placeholder {
+            color: #71767b;
+        }
+
+        .reply-input button {
+            background: #1d9bf0;
+            color: white;
+            border: none;
+            border-radius: 9999px;
+            padding: 0.5rem 1rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .reply {
+            padding: 0.75rem;
+            border-bottom: 1px solid #2f3336;
+        }
+
+        .reply .post-name {
+            font-size: 0.875rem;
+        }
+
+        /* Right Sidebar */
+        .right-sidebar {
+            width: 350px;
+            padding: 1rem;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+        }
+
+        .info-card {
+            background: rgba(239, 243, 244, 0.05);
+            border-radius: 1rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .info-card h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: #e7e9ea;
+        }
+
+        .info-card p {
+            font-size: 0.875rem;
+            color: #71767b;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #71767b;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #2f3336;
+            border-top-color: #1d9bf0;
+            border-radius: 50%;
+            margin: 0 auto 1rem;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Mobile */
+        @media (max-width: 1000px) {
+            .right-sidebar {
+                display: none;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .sidebar {
+                display: none;
+            }
+            
+            .feed {
+                max-width: 100%;
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen">
+<body>
 
-    <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-4 min-h-screen">
+<div class="app">
+    <!-- Left Sidebar -->
+    <aside class="sidebar">
+        <div class="logo">🐧</div>
         
-        <aside class="hidden md:flex flex-col col-span-1 p-6 border-r border-slate-200 sticky top-0 h-screen justify-between">
-            <div class="space-y-6">
-                <div class="flex items-center space-x-2 text-indigo-600 font-black text-2xl tracking-tight cursor-pointer" onclick="window.location.reload()">
-                    <span>🥷</span>
-                    <span>CampusCrypt</span>
-                </div>
-                <nav class="space-y-2">
-                    <button class="w-full flex items-center space-x-3 px-4 py-3 text-lg font-bold text-indigo-600 bg-indigo-50 rounded-full transition">
-                        <span>🏠</span> <span>Feed</span>
-                    </button>
-                    <a href="https://supabase.com" target="_blank" class="w-full flex items-center space-x-3 px-4 py-3 text-lg font-medium text-slate-600 hover:bg-slate-100 rounded-full transition">
-                        <span>⚡</span> <span>Backend</span>
-                    </a>
-                </nav>
+        <nav>
+            <div class="nav-item" onclick="switchTab('latest')">
+                <span class="nav-icon">🏠</span>
+                <span>Home</span>
             </div>
-            <div class="p-3 bg-slate-100 rounded-xl text-center">
-                <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Your Local ID</p>
-                <p id="local-session-badge" class="text-xs font-mono text-indigo-600 font-semibold truncate mt-1">Checking...</p>
+            <div class="nav-item" onclick="switchTab('trending')">
+                <span class="nav-icon">🔥</span>
+                <span>Trending</span>
             </div>
-        </aside>
+        </nav>
 
-        <main class="col-span-1 md:col-span-3 min-h-screen border-r border-slate-200 bg-white">
-            
-            <header class="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-200 z-10">
-                <div class="flex items-center justify-between p-4 md:hidden">
-                    <span class="text-indigo-600 font-black text-xl tracking-tight">🥷 CampusCrypt</span>
-                    <span id="mobile-session-badge" class="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded">...</span>
-                </div>
-                
-                <div class="flex border-t border-slate-100 md:border-t-0">
-                    <button id="tab-latest" class="flex-1 py-4 text-center text-slate-500 hover:bg-slate-50 transition font-medium feed-tab-active" onclick="switchFeedTab('latest')">
-                        Latest
-                    </button>
-                    <button id="tab-trending" class="flex-1 py-4 text-center text-slate-500 hover:bg-slate-50 transition font-medium" onclick="switchFeedTab('trending')">
-                        🔥 Trending
-                    </button>
-                </div>
-            </header>
+        <div class="session-badge" id="sessionBadge">
+            🐧 <span id="sessionIdShort">loading...</span>
+        </div>
+    </aside>
 
-            <section class="p-4 border-b border-slate-100 bg-white">
-                <div class="flex items-start space-x-3">
-                    <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-lg flex-shrink-0">
-                        👤
+    <!-- Main Feed -->
+    <main class="feed">
+        <div class="feed-header">
+            <h2 id="feedTitle">Home</h2>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('latest')">For you</div>
+            <div class="tab" onclick="switchTab('trending')">Trending</div>
+        </div>
+
+        <!-- Compose Box -->
+        <div class="compose">
+            <div class="avatar">🐧</div>
+            <div class="compose-input">
+                <textarea id="postContent" placeholder="What's happening on campus?" maxlength="280"></textarea>
+                <div class="compose-actions">
+                    <div class="category-select" id="categorySelect">
+                        <span class="category-chip" data-cat="general">🌐 General</span>
+                        <span class="category-chip" data-cat="cs101">💻 CS101</span>
+                        <span class="category-chip" data-cat="math201">📐 MATH201</span>
+                        <span class="category-chip" data-cat="professor">🧑‍🏫 Professor</span>
+                        <span class="category-chip" data-cat="campus">🏫 Campus</span>
                     </div>
-                    <div class="flex-1">
-                        <textarea id="post-textarea" maxlength="280" rows="3" class="w-full text-lg border-none focus:ring-0 resize-none outline-none placeholder-slate-400 py-1" placeholder="What's happening on campus? (Max 280 chars)"></textarea>
-                        
-                        <div class="text-right text-xs text-slate-400 mb-3" id="char-counter">0 / 280</div>
-                        
-                        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
-                            <div class="flex items-center space-x-2">
-                                <label for="category-select" class="text-xs font-bold text-slate-500 uppercase tracking-wider">Category:</label>
-                                <select id="category-select" class="bg-slate-100 text-slate-700 text-sm rounded-lg px-3 py-1.5 font-medium border-none focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
-                                    <option value="general">🌐 General</option>
-                                    <option value="cs101">💻 CS101</option>
-                                    <option value="math201">📐 MATH201</option>
-                                    <option value="professor">🧑‍🏫 Professor</option>
-                                    <option value="campus">🏫 Campus</option>
-                                </select>
-                            </div>
-                            
-                            <button id="submit-post-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-full font-bold transition shadow-sm disabled:opacity-50" onclick="handlePostSubmit()">
-                                Post Anon
-                            </button>
-                        </div>
-                    </div>
+                    <div class="char-count" id="charCount">0/280</div>
                 </div>
-            </section>
-
-            <div class="flex items-center space-x-2 p-3 bg-slate-50 overflow-x-auto no-scrollbar border-b border-slate-100">
-                <button class="bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap filter-btn" onclick="filterByCategory('all', this)">All Feed</button>
-                <button class="bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn" onclick="filterByCategory('general', this)">🌐 General</button>
-                <button class="bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn" onclick="filterByCategory('cs101', this)">💻 CS101</button>
-                <button class="bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn" onclick="filterByCategory('math201', this)">📐 MATH201</button>
-                <button class="bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn" onclick="filterByCategory('professor', this)">🧑‍🏫 Professor</button>
-                <button class="bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap filter-btn" onclick="filterByCategory('campus', this)">🏫 Campus</button>
-            </div>
-
-            <div id="feed-container" class="divide-y divide-slate-100">
-                <div class="p-4 animate-pulse space-y-3">
-                    <div class="flex space-x-3">
-                        <div class="rounded-full bg-slate-200 h-10 w-10"></div>
-                        <div class="flex-1 space-y-2 py-1">
-                            <div class="h-2 bg-slate-200 rounded w-1/4"></div>
-                            <div class="h-2 bg-slate-200 rounded w-3/4"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="feed-end" class="p-6 text-center text-sm text-slate-400 font-medium bg-slate-50">
-                Syncing directly with campus database...
-            </div>
-        </main>
-    </div>
-
-    <div id="thread-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4 hidden">
-        <div class="bg-white w-full max-w-2xl rounded-t-2xl md:rounded-2xl max-h-[90vh] md:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-            
-            <div class="p-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white">
-                <h3 class="font-bold text-lg text-slate-800">Anonymous Discussion</h3>
-                <button class="text-slate-400 hover:text-slate-600 text-2xl p-1" onclick="closeThreadModal()">✕</button>
-            </div>
-
-            <div class="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
-                <div id="modal-focus-post" class="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100/50"></div>
-                
-                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">Comments</div>
-                
-                <div id="modal-comments-container" class="space-y-3 divide-y divide-slate-50"></div>
-            </div>
-
-            <div class="p-4 border-t border-slate-200 bg-slate-50">
-                <div class="flex items-end space-x-2">
-                    <textarea id="reply-textarea" maxlength="280" rows="2" class="flex-1 bg-white border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none outline-none placeholder-slate-400" placeholder="Type an anonymous reply..."></textarea>
-                    <button id="submit-reply-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2.5 rounded-xl font-bold transition shadow-sm h-fit" onclick="handleReplySubmit()">
-                        Reply
-                    </button>
+                <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
+                    <button class="post-btn" onclick="createPost()">Post</button>
                 </div>
             </div>
         </div>
-    </div>
 
-    <script src="app.js"></script>
-    <script>
-        // Character counter implementation for UX comfort
-        const tx = document.getElementById('post-textarea');
-        const counter = document.getElementById('char-counter');
-        tx.addEventListener('input', () => {
-            counter.textContent = `${tx.value.length} / 280`;
-            if (tx.value.length >= 260) {
-                counter.className = "text-right text-xs text-rose-500 font-bold mb-3";
+        <!-- Filters -->
+        <div class="filters">
+            <span class="filter-chip active" data-filter="all" onclick="setFilter('all')">All</span>
+            <span class="filter-chip" data-filter="general" onclick="setFilter('general')">🌐 General</span>
+            <span class="filter-chip" data-filter="cs101" onclick="setFilter('cs101')">💻 CS101</span>
+            <span class="filter-chip" data-filter="math201" onclick="setFilter('math201')">📐 MATH201</span>
+            <span class="filter-chip" data-filter="professor" onclick="setFilter('professor')">🧑‍🏫 Professor</span>
+            <span class="filter-chip" data-filter="campus" onclick="setFilter('campus')">🏫 Campus</span>
+        </div>
+
+        <!-- Posts Container -->
+        <div id="postsContainer">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading whispers...</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Right Sidebar -->
+    <aside class="right-sidebar">
+        <div class="info-card">
+            <h3>🐧 CampusCrypt</h3>
+            <p>Anonymous campus conversations. No accounts. No trace.</p>
+        </div>
+        <div class="info-card">
+            <h3>🔥 Trending</h3>
+            <p>Most engaged posts from the last 24h.</p>
+        </div>
+        <div class="info-card">
+            <h3>🔒 Your session</h3>
+            <p id="sessionInfo">Anonymous ID: loading...</p>
+        </div>
+    </aside>
+</div>
+
+<!-- Thread Modal -->
+<div id="threadModal" class="modal hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Thread</h3>
+            <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div id="modalPost"></div>
+            <div id="modalReplies"></div>
+        </div>
+        <div class="reply-input">
+            <textarea id="replyContent" placeholder="Post your reply..." rows="2" maxlength="280"></textarea>
+            <button onclick="submitReply()">Reply</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ========== SUPABASE CONFIG ==========
+    const SUPABASE_URL = '{{SUPABASE_URL}}';
+    const SUPABASE_ANON_KEY = '{{SUPABASE_ANON_KEY}}';
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ========== GLOBAL STATE ==========
+    let sessionId = localStorage.getItem('crypt_session');
+    let currentTab = 'latest';
+    let currentFilter = 'all';
+    let currentPosts = [];
+    let currentPostId = null;
+    let realtimeChannel = null;
+
+    // ========== SESSION MANAGEMENT ==========
+    function initSession() {
+        if (!sessionId) {
+            sessionId = `SESSION_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+            localStorage.setItem('crypt_session', sessionId);
+        }
+        
+        const shortId = sessionId.slice(-8);
+        document.getElementById('sessionIdShort').innerHTML = shortId;
+        document.getElementById('sessionInfo').innerHTML = `Anonymous ID: ${shortId}`;
+        
+        return sessionId;
+    }
+
+    // ========== POST RENDERING ==========
+    function formatTime(timestamp) {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = Math.floor((now - date) / 1000);
+        
+        if (diff < 60) return `${diff}s`;
+        if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+        return `${Math.floor(diff / 86400)}d`;
+    }
+
+    function getCategoryEmoji(category) {
+        const emojis = {
+            'general': '🌐',
+            'cs101': '💻',
+            'math201': '📐',
+            'professor': '🧑‍🏫',
+            'campus': '🏫'
+        };
+        return emojis[category] || '📝';
+    }
+
+    async function likePost(postId, currentLikes) {
+        const { error } = await supabase
+            .from('likes')
+            .insert([{
+                post_id: postId,
+                session_id: sessionId
+            }]);
+        
+        if (!error) {
+            await supabase.rpc('increment_likes', { post_id: postId });
+            loadPosts();
+        }
+    }
+
+    function renderPosts(posts) {
+        const container = document.getElementById('postsContainer');
+        
+        if (!posts || posts.length === 0) {
+            container.innerHTML = `<div class="loading"><p>No whispers yet. Be the first to post!</p></div>`;
+            return;
+        }
+        
+        container.innerHTML = posts.map(post => `
+            <div class="post" onclick="openThread('${post.id}')">
+                <div class="post-header">
+                    <div class="post-avatar">🐧</div>
+                    <div class="post-content">
+                        <div class="post-meta">
+                            <span class="post-name">Anonymous</span>
+                            <span class="post-badge">·</span>
+                            <span class="post-time">${formatTime(post.created_at)}</span>
+                        </div>
+                        <div class="post-category">${getCategoryEmoji(post.category)} ${post.category}</div>
+                        <div class="post-text">${escapeHtml(post.content)}</div>
+                        <div class="post-actions">
+                            <div class="action-btn" onclick="event.stopPropagation(); likePost('${post.id}', ${post.likes || 0})">
+                                ❤️ ${post.likes || 0}
+                            </div>
+                            <div class="action-btn" onclick="event.stopPropagation(); openThread('${post.id}')">
+                                💬 ${post.reply_count || 0}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // ========== LOAD POSTS ==========
+    async function loadPosts() {
+        let query = supabase
+            .from('posts')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(50);
+        
+        if (currentFilter !== 'all') {
+            query = query.eq('category', currentFilter);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+            console.error('Error loading posts:', error);
+            return;
+        }
+        
+        let posts = data || [];
+        
+        if (currentTab === 'trending') {
+            const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            posts = posts.filter(p => new Date(p.created_at) > dayAgo);
+            posts.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+        }
+        
+        currentPosts = posts;
+        renderPosts(posts);
+    }
+
+    // ========== CREATE POST ==========
+    async function createPost() {
+        const content = document.getElementById('postContent').value.trim();
+        const category = document.querySelector('.category-chip.active')?.dataset.cat || 'general';
+        
+        if (!content) return;
+        if (content.length > 280) return;
+        
+        const postId = `POST_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        
+        const { error } = await supabase
+            .from('posts')
+            .insert([{
+                post_id: postId,
+                content: content,
+                category: category,
+                session_id: sessionId
+            }]);
+        
+        if (!error) {
+            document.getElementById('postContent').value = '';
+            updateCharCount();
+            loadPosts();
+        }
+    }
+
+    // ========== REPLY FUNCTION ==========
+    async function submitReply() {
+        const content = document.getElementById('replyContent').value.trim();
+        if (!content || !currentPostId) return;
+        
+        const { error } = await supabase
+            .from('replies')
+            .insert([{
+                post_id: currentPostId,
+                content: content,
+                session_id: sessionId
+            }]);
+        
+        if (!error) {
+            document.getElementById('replyContent').value = '';
+            await supabase.rpc('increment_reply_count', { post_id: currentPostId });
+            loadReplies(currentPostId);
+            loadPosts();
+        }
+    }
+
+    // ========== THREAD MODAL ==========
+    async function openThread(postId) {
+        currentPostId = postId;
+        const post = currentPosts.find(p => p.id === postId);
+        
+        const modalPostHtml = `
+            <div class="post" style="border: none; padding: 0; margin-bottom: 1rem;">
+                <div class="post-header">
+                    <div class="post-avatar">🐧</div>
+                    <div class="post-content">
+                        <div class="post-meta">
+                            <span class="post-name">Anonymous</span>
+                            <span class="post-badge">·</span>
+                            <span class="post-time">${formatTime(post.created_at)}</span>
+                        </div>
+                        <div class="post-category">${getCategoryEmoji(post.category)} ${post.category}</div>
+                        <div class="post-text">${escapeHtml(post.content)}</div>
+                        <div class="post-actions">
+                            <div class="action-btn">❤️ ${post.likes || 0}</div>
+                            <div class="action-btn">💬 ${post.reply_count || 0}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('modalPost').innerHTML = modalPostHtml;
+        await loadReplies(postId);
+        document.getElementById('threadModal').classList.remove('hidden');
+    }
+
+    async function loadReplies(postId) {
+        const { data, error } = await supabase
+            .from('replies')
+            .select('*')
+            .eq('post_id', postId)
+            .order('created_at', { ascending: true });
+        
+        if (error) {
+            console.error('Error loading replies:', error);
+            return;
+        }
+        
+        const repliesHtml = (data || []).map(reply => `
+            <div class="reply">
+                <div class="post-meta" style="margin-bottom: 0.25rem;">
+                    <span class="post-name">Anonymous</span>
+                    <span class="post-badge">·</span>
+                    <span class="post-time">${formatTime(reply.created_at)}</span>
+                </div>
+                <div class="post-text" style="font-size: 0.875rem;">${escapeHtml(reply.content)}</div>
+                <div class="action-btn" style="margin-top: 0.5rem; font-size: 0.75rem;">❤️ ${reply.likes || 0}</div>
+            </div>
+        `).join('');
+        
+        document.getElementById('modalReplies').innerHTML = repliesHtml || '<div class="loading"><p>No replies yet.</p></div>';
+    }
+
+    function closeModal() {
+        document.getElementById('threadModal').classList.add('hidden');
+        currentPostId = null;
+    }
+
+    // ========== UI CONTROLS ==========
+    function switchTab(tab) {
+        currentTab = tab;
+        const tabs = document.querySelectorAll('.tab');
+        tabs.forEach((t, i) => {
+            if ((tab === 'latest' && i === 0) || (tab === 'trending' && i === 1)) {
+                t.classList.add('active');
             } else {
-                counter.className = "text-right text-xs text-slate-400 mb-3";
+                t.classList.remove('active');
             }
         });
-    </script>
+        
+        document.getElementById('feedTitle').innerHTML = tab === 'latest' ? 'Home' : 'Trending';
+        loadPosts();
+    }
+
+    function setFilter(filter) {
+        currentFilter = filter;
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            if (chip.getAttribute('data-filter') === filter) {
+                chip.classList.add('active');
+            } else {
+                chip.classList.remove('active');
+            }
+        });
+        loadPosts();
+    }
+
+    function updateCharCount() {
+        const content = document.getElementById('postContent').value;
+        const count = content.length;
+        const counter = document.getElementById('charCount');
+        counter.innerHTML = `${count}/280`;
+        
+        if (count > 260) {
+            counter.classList.add('warning');
+        } else {
+            counter.classList.remove('warning');
+        }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // ========== CATEGORY SELECTION ==========
+    document.querySelectorAll('.category-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            document.querySelectorAll('.category-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+        });
+    });
+
+    // ========== REAL-TIME SUBSCRIPTION ==========
+    function setupRealtime() {
+        if (realtimeChannel) {
+            supabase.removeChannel(realtimeChannel);
+        }
+        
+        realtimeChannel = supabase
+            .channel('public:posts')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, () => {
+                loadPosts();
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, () => {
+                loadPosts();
+            })
+            .subscribe();
+    }
+
+    // ========== INITIALIZATION ==========
+    document.getElementById('postContent').addEventListener('input', updateCharCount);
+    window.switchTab = switchTab;
+    window.setFilter = setFilter;
+    window.createPost = createPost;
+    window.openThread = openThread;
+    window.closeModal = closeModal;
+    window.submitReply = submitReply;
+    window.likePost = likePost;
+
+    initSession();
+    setupRealtime();
+    loadPosts();
+</script>
 </body>
 </html>
