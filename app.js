@@ -2,41 +2,53 @@
 // 1. CONFIGURATION & IDENTITY INITIALIZATION
 // ==========================================
 
-// Put your live Supabase configuration string data points here
 const SUPABASE_URL = 'https://xtqfbaqckgodxmsnyexh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0cWZiYXFja2dvZHhtc255ZXhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTgwODIsImV4cCI6MjA5Njg3NDA4Mn0.cWsx_9gyk3m9Dz6ZMn_8qHQ0s_20qiNvJTUn8Q0p3uM';
 
-// Resolve user persistence session key
+
 let currentSessionId = localStorage.getItem('crypt_session');
 if (!currentSessionId) {
     currentSessionId = `SESSION_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
     localStorage.setItem('crypt_session', currentSessionId);
 }
 
-// Draw identifying session badges safely
 const badgeNode = document.getElementById('local-session-badge');
 if (badgeNode) badgeNode.textContent = currentSessionId.substring(8, 18).toUpperCase();
 
-// Instantiate the Client mapping mechanism
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     global: {
         headers: { 'x-session-id': currentSessionId },
     },
 });
 
-// Global state tracking layout properties
 let globalCurrentFeedTab = 'latest';     
 let globalCurrentCategory = 'all';       
 let globalActiveFocusedPostId = null;   
 
-// Mount engine initialization handlers
 window.addEventListener('DOMContentLoaded', () => {
     fetchAndRenderFeed();
     initializeRealTimePipeline();
 });
 
 // ==========================================
-// 2. DATA READ STREAMING PIPELINES
+// 2. NEW COMPOSER MODAL WINDOW TOGGLES
+// ==========================================
+
+function openComposerModal() {
+    const modal = document.getElementById('composer-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        document.getElementById('post-textarea').focus();
+    }
+}
+
+function closeComposerModal() {
+    const modal = document.getElementById('composer-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+// ==========================================
+// 3. DATA READ STREAMING PIPELINES
 // ==========================================
 
 async function fetchAndRenderFeed() {
@@ -64,14 +76,8 @@ async function fetchAndRenderFeed() {
         return;
     }
 
-    // In trending view mode, manually sort by dynamic calculation array properties
-    if (globalCurrentFeedTab === 'trending') {
-        // Fallback arrangement rule if target counts aren't resolved yet
-    }
-
     feedContainer.innerHTML = '';
 
-    // Loop nodes and safely aggregate exact live count queries sequentially
     for (const post of posts) {
         const { count: likesCount } = await supabaseClient
             .from('likes')
@@ -141,7 +147,7 @@ function compilePostHtmlNode(post) {
 }
 
 // ==========================================
-// 3. TARGET MUTATION PIPELINES
+// 4. TARGET MUTATION PIPELINES
 // ==========================================
 
 async function handlePostSubmit() {
@@ -173,8 +179,10 @@ async function handlePostSubmit() {
         return;
     }
 
+    // Reset fields and close out the window drawer instantly
     textarea.value = '';
     document.getElementById('char-counter').textContent = '0 / 280';
+    closeComposerModal();
     
     // Targeted Injection: Slip element dynamically to the top list
     const container = document.getElementById('feed-container');
@@ -220,7 +228,7 @@ async function togglePostLikeState(postId, buttonNode) {
 }
 
 // ==========================================
-// 4. DISCUSSION MODAL SUBSYSTEMS
+// 5. DISCUSSION MODAL SUBSYSTEMS
 // ==========================================
 
 async function openThreadModal(postId) {
@@ -308,7 +316,6 @@ async function handleReplySubmit() {
     textarea.value = '';
     await fetchAndRenderComments(globalActiveFocusedPostId);
     
-    // Targeted injection to increment structural count tag in background timeline node view
     const postCard = document.getElementById(`ui-post-${globalActiveFocusedPostId}`);
     if (postCard) {
         const commentCounter = postCard.querySelector('.comment span');
@@ -339,7 +346,7 @@ function closeThreadModal() {
 }
 
 // ==========================================
-// 5. NAVIGATION FILTERS & CONTROL ARRAYS
+// 6. NAVIGATION FILTERS & CONTROL ARRAYS
 // ==========================================
 
 function switchFeedTab(tabName) {
@@ -357,7 +364,7 @@ function filterByCategory(categoryName, elementNode) {
 }
 
 // ==========================================
-// 6. REAL-TIME EVENT STREAM TUNNELS
+// 7. REAL-TIME EVENT STREAM TUNNELS
 // ==========================================
 
 function initializeRealTimePipeline() {
@@ -371,7 +378,6 @@ function initializeRealTimePipeline() {
                         if (container.querySelector('div[style*="text-align:center"]')) container.innerHTML = '';
                         
                         const incomingPost = payload.new;
-                        // Avoid duplication if authored locally
                         if (document.getElementById(`ui-post-${incomingPost.id}`)) return;
 
                         incomingPost.likes_count = 0;
@@ -379,7 +385,7 @@ function initializeRealTimePipeline() {
                         incomingPost.has_user_liked = false;
                         
                         const incomingNode = compilePostHtmlNode(incomingPost);
-                        incomingNode.style.background = '#0a192f'; // Highlight entry flash color
+                        incomingNode.style.background = '#16181c'; 
                         container.insertBefore(incomingNode, container.firstChild);
                         setTimeout(() => incomingNode.style.background = 'transparent', 1500);
                     }
@@ -393,7 +399,7 @@ function initializeRealTimePipeline() {
 }
 
 // ==========================================
-// 7. UTILITY SANITIZATION LAYER
+// 8. UTILITY SANITIZATION LAYER
 // ==========================================
 
 function escapeHtmlMarkup(stringInput) {

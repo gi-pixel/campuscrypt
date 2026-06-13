@@ -39,7 +39,7 @@
       position: sticky;
       top: 0;
       background: rgba(0, 0, 0, 0.85);
-      backdrop-blur: md;
+      backdrop-filter: blur(8px);
       padding: 14px 14px 0 14px;
       border-bottom: 1px solid #222;
       z-index: 100;
@@ -106,74 +106,6 @@
       height: 4px;
       border-radius: 10px;
       background: #1d9bf0;
-    }
-
-    /* COMPOSER DRAWER PANEL */
-    .composer-panel {
-      padding: 16px;
-      border-bottom: 1px solid #222;
-      background: #000;
-    }
-
-    .composer-row {
-      display: flex;
-      gap: 12px;
-    }
-
-    .composer-content {
-      width: 100%;
-    }
-
-    .composer-panel textarea {
-      width: 100%;
-      background: transparent;
-      border: none;
-      outline: none;
-      color: white;
-      font-size: 18px;
-      resize: none;
-      margin-bottom: 8px;
-    }
-
-    .composer-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-top: 1px solid #111;
-      padding-top: 12px;
-    }
-
-    .composer-panel select {
-      background: #16181c;
-      color: #71767b;
-      border: 1px solid #222;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 13px;
-      outline: none;
-      cursor: pointer;
-    }
-
-    .char-counter {
-      color: #71767b;
-      font-size: 12px;
-      margin-right: 12px;
-    }
-
-    .post-btn {
-      background: #1d9bf0;
-      color: white;
-      border: none;
-      padding: 8px 18px;
-      border-radius: 20px;
-      font-weight: bold;
-      font-size: 14px;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-
-    .post-btn:disabled {
-      opacity: 0.5;
     }
 
     /* CATEGORY TRACK HORIZONTAL FILTER */
@@ -283,7 +215,7 @@
       line-height: 1.4;
       margin-bottom: 12px;
       white-space: pre-wrap;
-      break-words: break-all;
+      word-break: break-word;
     }
 
     /* ACTIONS MAP */
@@ -306,7 +238,7 @@
     .action.liked { color: #f91880 !important; }
     .action.liked i { font-weight: 900; }
 
-    /* DISCUSSION THREAD OVERLAY MODAL */
+    /* OVERLAY MODAL COMMON SYSTEM */
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -327,7 +259,6 @@
       border: 1px solid #222;
       max-height: 80vh;
       display: flex;
-      flex-col: column;
       flex-direction: column;
       overflow: hidden;
     }
@@ -354,6 +285,66 @@
       flex: 1;
     }
 
+    /* COMPOSER MODAL CUSTOM LAYOUT */
+    .composer-modal-content {
+      display: flex;
+      gap: 12px;
+    }
+
+    .composer-modal-content textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: white;
+      font-size: 18px;
+      resize: none;
+      min-height: 120px;
+    }
+
+    .composer-modal-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px;
+      border-top: 1px solid #222;
+      background: #050505;
+    }
+
+    .composer-modal-meta select {
+      background: #16181c;
+      color: #71767b;
+      border: 1px solid #222;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .char-counter {
+      color: #71767b;
+      font-size: 12px;
+      margin-right: 12px;
+    }
+
+    .post-btn {
+      background: #1d9bf0;
+      color: white;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .post-btn:disabled {
+      opacity: 0.5;
+    }
+
+    /* DISCUSSION THREAD MODAL OVERLAY */
     #modal-focus-post {
       border-bottom: 1px solid #222;
       padding-bottom: 16px;
@@ -388,7 +379,7 @@
       font-size: 14px;
     }
 
-    /* FIXED LAYOUT ITEMS */
+    /* FIXED INTERACTIVE ACTION BUTTONS */
     .float-btn {
       position: fixed;
       bottom: 74px;
@@ -400,11 +391,15 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      font-size: 22px;
+      font-size: 24px;
       color: white;
       box-shadow: 0 4px 12px rgba(0,0,0,0.5);
       cursor: pointer;
       z-index: 99;
+      transition: transform 0.2s;
+    }
+    .float-btn:hover {
+      transform: scale(1.05);
     }
 
     .bottom-nav {
@@ -446,30 +441,6 @@
       </div>
     </div>
 
-    <section class="composer-panel">
-      <div class="composer-row">
-        <div class="avatar">🥷</div>
-        <div class="composer-content">
-          <textarea id="post-textarea" maxlength="280" rows="3" placeholder="What's happening on campus anonymously?"></textarea>
-          <div class="composer-meta">
-            <div>
-              <select id="category-select">
-                <option value="general">🌐 General</option>
-                <option value="cs101">💻 CS101</option>
-                <option value="math201">📐 MATH201</option>
-                <option value="professor">🧑‍🏫 Professor</option>
-                <option value="campus">🏫 Campus</option>
-              </select>
-            </div>
-            <div>
-              <span id="char-counter" class="char-counter">0 / 280</span>
-              <button id="submit-post-btn" class="post-btn" onclick="handlePostSubmit()">Post Anon</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <div class="category-bar">
       <div class="cat-pill active" onclick="filterByCategory('all', this)">All Feed</div>
       <div class="cat-pill" onclick="filterByCategory('general', this)">🌐 General</div>
@@ -487,15 +458,45 @@
 
   </div>
 
-  <div class="float-btn" onclick="document.getElementById('post-textarea').focus()">
-    <i class="fa-solid fa-feather-pointed"></i>
+  <div class="float-btn" onclick="openComposerModal()">
+    <i class="fa-solid fa-plus"></i>
   </div>
 
   <div class="bottom-nav">
     <i class="fa-solid fa-house" onclick="window.location.reload()"></i>
-    <i class="fa-solid fa-magnifying-glass" onclick="document.getElementById('post-textarea').focus()"></i>
+    <i class="fa-solid fa-magnifying-glass" onclick="openComposerModal()"></i>
     <i class="fa-regular fa-bell" onclick="alert('Notifications coming soon!')"></i>
-    <i class="fa-regular fa-envelope" onclick="alert('Encrypted direct messaging alpha test next week.')"></i>
+    <i class="fa-regular fa-envelope" onclick="alert('Encrypted alpha direct messaging incoming.')"></i>
+  </div>
+
+  <div id="composer-modal" class="modal-overlay hidden" onclick="closeComposerModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span style="font-weight: bold;">Draft Anonymous Post</span>
+        <button class="modal-close" onclick="closeComposerModal()">✕</button>
+      </div>
+      <div class="modal-scroll">
+        <div class="composer-modal-content">
+          <div class="avatar">🥷</div>
+          <textarea id="post-textarea" maxlength="280" rows="4" placeholder="What's happening on campus?"></textarea>
+        </div>
+      </div>
+      <div class="composer-modal-meta">
+        <div>
+          <select id="category-select">
+            <option value="general">🌐 General</option>
+            <option value="cs101">💻 CS101</option>
+            <option value="math201">📐 MATH201</option>
+            <option value="professor">🧑‍🏫 Professor</option>
+            <option value="campus">🏫 Campus</option>
+          </select>
+        </div>
+        <div>
+          <span id="char-counter" class="char-counter">0 / 280</span>
+          <button id="submit-post-btn" class="post-btn" onclick="handlePostSubmit()">Post Anon</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="thread-modal" class="modal-overlay hidden" onclick="closeThreadModal()">
@@ -518,7 +519,7 @@
 
   <script src="app.js"></script>
   <script>
-    // Inline Character Counter feedback logic
+    // Inline Character Counter feedback logic inside Composer Modal
     const txtArea = document.getElementById('post-textarea');
     const cnt = document.getElementById('char-counter');
     if (txtArea && cnt) {
