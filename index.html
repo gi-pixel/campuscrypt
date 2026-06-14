@@ -45,143 +45,153 @@
       z-index: 100;
     }
 
-   /* CINEMATIC ONBOARDING LAYER SYSTEM */
-    .splash-screen {
-      position: fixed;
-      inset: 0;
-      background: #050608;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-      transition: opacity 0.6s ease, visibility 0.6s ease;
-      padding: 24px;
-    }
-    .splash-screen.fade-out { 
-      opacity: 0; 
-      visibility: hidden; 
-    }
+   /* ==========================================
+   CINEMATIC ONBOARDING LAYER SYSTEM
+   ========================================== */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  background: #050608;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  /* 🌟 FIXED: Consolidated transition handles transform smoothly now */
+  transition: opacity 0.5s ease, transform 0.5s ease-out, visibility 0.5s ease;
+  padding: 24px;
+  opacity: 1;
+  visibility: visible;
+}
 
-    /* Cinematic CRT Scanlines */
-    .splash-screen::after {
-      content: " ";
-      display: block;
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
-      background-size: 100% 4px;
-      z-index: 2;
-      pointer-events: none;
-    }
+/* 🌟 FIXED: Unified into a single, unbreakable hardware-accelerated fade out rule */
+.splash-screen.fade-out { 
+  opacity: 0 !important; 
+  transform: scale(0.95);
+  visibility: hidden !important;
+  pointer-events: none; /* Stops users from clicking background elements while it disappears */
+}
 
-    .splash-stage {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      max-width: 520px;
-      z-index: 3;
-      transition: all 0.5s ease;
-    }
-    .splash-stage.hidden {
-      display: none !important;
-    }
+/* Cinematic CRT Scanlines */
+.splash-screen::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+  background-size: 100% 4px;
+  z-index: 2;
+  pointer-events: none;
+}
 
-    .splash-logo {
-      font-size: 40px;
-      font-weight: 900;
-      letter-spacing: -1.5px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      animation: complexIntroPulse 2.5s infinite alternate ease-in-out;
-    }
-    .splash-logo .white-text { color: #ffffff; }
-    .splash-logo .blue-text { 
-      color: #1d9bf0; 
-      text-shadow: 0 0 20px rgba(29, 155, 240, 0.6); 
-    }
+.splash-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 520px;
+  z-index: 3;
+  transition: all 0.5s ease;
+}
+.splash-stage.hidden {
+  display: none !important;
+}
 
-    .splash-subtext {
-      color: #71767b;
-      font-size: 12px;
-      margin-top: 16px;
-      font-family: monospace;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      text-align: center;
-    }
+.splash-logo {
+  font-size: 40px;
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  animation: complexIntroPulse 2.5s infinite alternate ease-in-out;
+}
+.splash-logo .white-text { color: #ffffff; }
+.splash-logo .blue-text { 
+  color: #1d9bf0; 
+  text-shadow: 0 0 20px rgba(29, 155, 240, 0.6); 
+}
 
-    /* RULES & REGULATIONS FRAME layout */
-    .rules-card {
-      background: #0d0e12;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 28px;
-      width: 100%;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
+.splash-subtext {
+  color: #71767b;
+  font-size: 12px;
+  margin-top: 16px;
+  font-family: monospace;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-align: center;
+}
 
-    .rules-heading {
-      font-size: 20px;
-      font-weight: 800;
-      color: #ffffff;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+/* RULES & REGULATIONS FRAME layout */
+.rules-card {
+  background: #0d0e12;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 28px;
+  width: 100%;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
 
-    .rules-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      margin-bottom: 20px;
-    }
+.rules-heading {
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
-    .rules-list li {
-      font-size: 14px;
-      line-height: 1.4;
-      color: #e7e9ea;
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-    }
+.rules-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
 
-    .rules-list li i {
-      color: #1d9bf0;
-      margin-top: 3px;
-      font-size: 12px;
-    }
+.rules-list li {
+  font-size: 14px;
+  line-height: 1.4;
+  color: #e7e9ea;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
 
-    /* PREMIUM INTERACTIVE NAV BUTTONS */
-    .splash-btn {
-      background: #1d9bf0;
-      color: white;
-      border: none;
-      padding: 12px 32px;
-      border-radius: 25px;
-      font-weight: 800;
-      font-size: 14px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      box-shadow: none;
-    }
-    .splash-btn:hover {
-      background: #1a8cd8;
-      transform: translateY(-1px);
-    }
+.rules-list li i {
+  color: #1d9bf0;
+  margin-top: 3px;
+  font-size: 12px;
+}
 
-    @keyframes complexIntroPulse {
-      0% { transform: scale(0.97); }
-      100% { transform: scale(1.02); }
-    }
+/* PREMIUM INTERACTIVE NAV BUTTONS */
+.splash-btn {
+  background: #1d9bf0;
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 25px;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: none;
+}
+.splash-btn:hover {
+  background: #1a8cd8;
+  transform: translateY(-1px);
+}
+
+@keyframes complexIntroPulse {
+  0% { transform: scale(0.97); }
+  100% { transform: scale(1.02); }
+}
+
     .search-box {
       display: flex;
       align-items: center;

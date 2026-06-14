@@ -30,15 +30,29 @@ let globalActiveFocusedPostId = null;
 // CORE RE-ENGINEERED LIFECYCLE INITIALIZER
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
-    // 1. Sync UI visual markers to match stored local configuration state parameters
-    if (document.getElementById('tab-latest') && document.getElementById('tab-trending')) {
-        document.getElementById('tab-latest').className = globalCurrentFeedTab === 'latest' ? 'active' : '';
-        document.getElementById('tab-trending').className = globalCurrentFeedTab === 'trending' ? 'active' : '';
+    // 1. Attempt to retrieve an existing encrypted session tracking ID
+    const existingSession = localStorage.getItem('cc_session_id');
+
+    // MATCHED TO YOUR HTML: Grab your true outer wrapper layer ID
+    const splashLayer = document.getElementById('splash-layer'); 
+    const mainAppLayout = document.getElementById('main-app-layout'); // Ensure this matches your timeline page ID layout wrapper!
+
+    if (existingSession) {
+        // SCENARIO A: Authenticated Peer Returning
+        currentSessionId = existingSession;
+
+        // Hide the onboarding splash block and show your timeline app layout instantly
+        if (splashLayer) splashLayer.classList.add('hidden');
+        if (mainAppLayout) mainAppLayout.classList.remove('hidden');
+
+        // Fire off your ultra-fast optimized feed renderer right away!
+        fetchAndRenderFeed();
+
+    } else {
+        // SCENARIO B: Brand New User Approaching
+        if (mainAppLayout) mainAppLayout.classList.add('hidden');
+        if (splashLayer) splashLayer.classList.remove('hidden');
     }
-
-
-    fetchAndRenderFeed();
-    initializeRealTimePipeline();
 });
 
 // ==========================================
@@ -56,10 +70,44 @@ function advanceToRulesScreen() {
 
 function acceptRulesAndEnterApp() {
     const mainSplashLayer = document.getElementById('splash-layer');
-    if (mainSplashLayer) {
-        mainSplashLayer.classList.add('fade-out');
+    const mainAppLayout = document.getElementById('main-app-layout');
+
+    if (!mainSplashLayer) return;
+
+    // 1. Commit the session verification string to memory instantly
+    const newSessionId = 'cc_peer_' + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('cc_session_id', newSessionId);
+    currentSessionId = newSessionId;
+
+    // 2. Clear any hidden classes from the timeline layout underneath so it mounts invisibly
+    if (mainAppLayout) {
+        mainAppLayout.style.opacity = '0';
+        mainAppLayout.classList.remove('hidden');
     }
+
+    // 3. Trigger the unified CSS transition fade-out sequence
+    mainSplashLayer.classList.add('fade-out');
+
+    // 4. Smoothly bring the main dashboard timeline up into focus
+    setTimeout(() => {
+        if (mainAppLayout) {
+            mainAppLayout.style.transition = 'opacity 0.4s ease';
+            mainAppLayout.style.opacity = '1';
+        }
+    }, 150);
+
+    // 5. Hard stop: Remove the splash layer completely from layout visibility after fade finishes
+    setTimeout(() => {
+        mainSplashLayer.style.display = 'none'; // Lockout complete!
+        
+        // Load data safely with zero UI race conflicts
+        if (typeof fetchAndRenderFeed === 'function') {
+            fetchAndRenderFeed();
+        }
+    }, 500);
 }
+
+
 
 // ==========================================
 // 2. NEW COMPOSER MODAL WINDOW TOGGLES
