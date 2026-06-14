@@ -40,7 +40,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const splashLayer = document.getElementById('splash-layer'); 
     const mainAppLayout = document.querySelector('.twitter'); 
 
-    console.log("🔒 CampusCrypt Handshake - Active Session:", existingSession);
+    console.log("CampusCrypt Handshake - Active Session:", existingSession);
 
     if (existingSession) {
         // 🌟 SCENARIO A: Authenticated Peer Returning
