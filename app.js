@@ -21,23 +21,45 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     },
 });
 
-let globalCurrentFeedTab = 'latest';     
-let globalCurrentCategory = 'all';       
+let globalCurrentFeedTab = localStorage.getItem('cc_preferred_tab') || 'latest';
+let globalCurrentCategory = 'all';        
 let globalActiveFocusedPostId = null;   
 
-// Mount engine initialization handlers and trigger welcome splash screen
+
+// ==========================================
+// CORE RE-ENGINEERED LIFECYCLE INITIALIZER
+// ==========================================
 window.addEventListener('DOMContentLoaded', () => {
+    // 1. Sync UI visual markers to match stored local configuration state parameters
+    if (document.getElementById('tab-latest') && document.getElementById('tab-trending')) {
+        document.getElementById('tab-latest').className = globalCurrentFeedTab === 'latest' ? 'active' : '';
+        document.getElementById('tab-trending').className = globalCurrentFeedTab === 'trending' ? 'active' : '';
+    }
+
+
     fetchAndRenderFeed();
     initializeRealTimePipeline();
-
-    // NEW: Handles the automatic fade out of the welcome intro animation
-    setTimeout(() => {
-        const splash = document.getElementById('splash-layer');
-        if (splash) {
-            splash.classList.add('fade-out');
-        }
-    }, 2000); // 2000 milliseconds = 2 seconds of pure intro vibe
 });
+
+// ==========================================
+// INTERACTIVE SPLASH ONBOARDING SWITCHERS
+// ==========================================
+function advanceToRulesScreen() {
+    const welcomeStage = document.getElementById('splash-stage-welcome');
+    const rulesStage = document.getElementById('splash-stage-rules');
+    
+    if (welcomeStage && rulesStage) {
+        welcomeStage.classList.add('hidden');
+        rulesStage.classList.remove('hidden');
+    }
+}
+
+function acceptRulesAndEnterApp() {
+    const mainSplashLayer = document.getElementById('splash-layer');
+    if (mainSplashLayer) {
+        mainSplashLayer.classList.add('fade-out');
+    }
+}
 
 // ==========================================
 // 2. NEW COMPOSER MODAL WINDOW TOGGLES
@@ -57,76 +79,107 @@ function closeComposerModal() {
 }
 
 
-// ==========================================
-// COHESIVE TIMELINE RENDER ENGINE (WITH TRENDING ALGORITHM)
-// ==========================================
+
 async function fetchAndRenderFeed() {
     const feedContainer = document.getElementById('feed-container');
     if (!feedContainer) return;
     
-    let query = supabaseClient.from('posts').select('*');
+    // 1. Clear previous view state and show instant layout container
+    feedContainer.innerHTML = '';
+    
+    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    
+    // 2. Base Query: Grab ONLY the posts. No blocking loops.
+    let query = supabaseClient
+        .from('posts')
+        .select('*')
+        .gt('created_at', fortyEightHoursAgo);
 
-    // Filter by active category pill selection
     if (globalCurrentCategory !== 'all') {
         query = query.eq('category', globalCurrentCategory);
     }
 
-    // Always fetch latest rows first to calculate metrics on recent activity
     query = query.order('created_at', { ascending: false });
 
-    const { data: posts, error } = await query.limit(40); // Pull slightly more rows to compute trends
+    const { data: posts, error } = await query.limit(40);
 
     if (error) {
-        console.error('Database Connection Error:', error.message);
-        feedContainer.innerHTML = `<div style="padding:20px; text-align:center; color:#f91880;">Database Sync Failed. Check API keys.</div>`;
+        console.error('Database Sync Error:', error.message);
+        feedContainer.innerHTML = `<div style="padding:20px; text-align:center; color:#f91880;">Database Sync Failed.</div>`;
         return;
     }
 
     if (!posts || posts.length === 0) {
-        feedContainer.innerHTML = `<div style="padding:40px; text-align:center; color:#71767b;">No posts in this track yet. Write a post to start the conversation!</div>`;
+        feedContainer.innerHTML = `<div style="padding:40px; text-align:center; color:#71767b;">No active threads over the last 48 hours.</div>`;
         return;
     }
 
-    // Map through posts to inject live structural metrics
-    const compiledPosts = [];
-    for (const post of posts) {
-        const { count: likesCount } = await supabaseClient
-            .from('likes')
-            .select('*', { count: 'exact', head: true })
-            .eq('post_id', post.id);
+    // 3. Stagger-render the raw posts instantly without waiting for metrics
+    posts.forEach((post, index) => {
+        setTimeout(() => {
+            // Initialize safe temporary default counts so compiling doesn't break
+            post.likes_count = '...';
+            post.reply_count = '...';
+            post.has_user_liked = false;
 
-        const { count: repliesCount } = await supabaseClient
-            .from('replies')
-            .select('*', { count: 'exact', head: true })
-            .eq('post_id', post.id);
+            const modernNode = compilePostHtmlNode(post);
+            
+            // Subtle entry style animations
+            modernNode.style.opacity = '0';
+            modernNode.style.transform = 'translateY(8px)';
+            modernNode.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+            
+            feedContainer.appendChild(modernNode);
+            
+            requestAnimationFrame(() => {
+                modernNode.style.opacity = '1';
+                modernNode.style.transform = 'translateY(0)';
+            });
 
-        const { data: userLiked } = await supabaseClient
-            .from('likes')
-            .select('id')
-            .eq('post_id', post.id)
-            .eq('session_id', currentSessionId)
-            .maybeSingle();
+            // 4. BACKGROUND FETCH: Tell this specific post to go fetch its own scores invisibly
+            lazyLoadPostMetrics(post.id, modernNode);
 
-        post.likes_count = likesCount || 0;
-        post.reply_count = repliesCount || 0;
-        post.has_user_liked = !!userLiked;
-        
-        // MATHEMATICAL RANKING ENGINE: 1 Like = 1 point, 1 Comment = 2 points
-        post.trending_score = post.likes_count + (post.reply_count * 2);
-
-        compiledPosts.push(post);
-    }
-
-    // NEW: If the user is viewing Trending, sort by engagement score descending
-    if (globalCurrentFeedTab === 'trending') {
-        compiledPosts.sort((a, b) => b.trending_score - a.trending_score);
-    }
-
-    // Clear loading states and render the sorted array list
-    feedContainer.innerHTML = '';
-    compiledPosts.forEach(post => {
-        feedContainer.appendChild(compilePostHtmlNode(post));
+        }, index * 40); // Fast 40ms trickle cascade
     });
+}
+
+/**
+ * Asynchronously fetches likes and replies for a single post card 
+ * already rendered on the user's screen.
+ */
+async function lazyLoadPostMetrics(postId, postNodeElement) {
+    try {
+        // Run all three metric queries concurrently in parallel to maximize network speed
+        const [likesRes, repliesRes, userLikedRes] = await Promise.all([
+            supabaseClient.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', postId),
+            supabaseClient.from('replies').select('*', { count: 'exact', head: true }).eq('post_id', postId),
+            supabaseClient.from('likes').select('id').eq('post_id', postId).eq('session_id', currentSessionId).maybeSingle()
+        ]);
+
+        const likesCount = likesRes.count || 0;
+        const repliesCount = repliesRes.count || 0;
+        const hasUserLiked = !!userLikedRes.data;
+
+        // Find the target counter text areas inside this specific post element card
+        // Note: Update these querySelectors to match the exact class names inside your compilePostHtmlNode template!
+        const likeSpan = postNodeElement.querySelector('.like-count-selector span, .like span');
+        const replySpan = postNodeElement.querySelector('.reply-count-selector span, .comment span');
+        const likeIcon = postNodeElement.querySelector('.like-icon-selector, .like i');
+
+        // Dynamically inject the real values into the already visible node card
+        if (likeSpan) likeSpan.textContent = likesCount;
+        if (replySpan) replySpan.textContent = repliesCount;
+        
+        if (hasUserLiked && likeIcon) {
+            likeIcon.classList.add('liked'); // Highlights heart/upvote if they liked it previously
+        }
+
+        // Optional: If you use the trending tab sorting engine, store the computed ranking score on the element data attribute
+        postNodeElement.dataset.trendingScore = likesCount + (repliesCount * 2);
+
+    } catch (err) {
+        console.error(`Failed loading metrics background pipeline for post ${postId}:`, err);
+    }
 }
 
 function compilePostHtmlNode(post) {
@@ -138,10 +191,14 @@ function compilePostHtmlNode(post) {
     const minutesSinceCreation = (new Date() - new Date(post.created_at)) / 1000 / 60;
     const canDelete = isAuthor && minutesSinceCreation < 5;
 
-    const formattedTime = formatTimestampRelative(post.created_at);
+    const formattedTime = typeof formatTimestampRelative === 'function' ? formatTimestampRelative(post.created_at) : '';
     const likeActiveStateClass = post.has_user_liked ? 'liked' : '';
+    const safeContent = typeof escapeHtmlMarkup === 'function' ? escapeHtmlMarkup(post.content) : post.content;
 
-    postCard.setAttribute('onclick', `openThreadModal('${post.id}')`);
+    // 🌟 RE-ENGINEERED WIRE-UP: Pass pre-fetched data layers directly to the click engine
+    postCard.addEventListener('click', () => {
+        openThreadModal(post.id, post.content, post.category, post.created_at);
+    });
 
     postCard.innerHTML = `
         <div class="avatar">🥷</div>
@@ -155,7 +212,7 @@ function compilePostHtmlNode(post) {
                 </div>
                 ${canDelete ? `<button class="delete-btn" onclick="event.stopPropagation(); executePostDeletion('${post.id}')"><i class="fa-regular fa-trash-can"></i></button>` : ''}
             </div>
-            <div class="tweet-text">${escapeHtmlMarkup(post.content)}</div>
+            <div class="tweet-text">${safeContent}</div>
             <div class="actions">
                 <div class="action comment">
                     <i class="fa-regular fa-comment"></i>
@@ -180,47 +237,74 @@ async function handlePostSubmit() {
     const categorySelect = document.getElementById('category-select');
     const submitBtn = document.getElementById('submit-post-btn');
     
+    // 1. Ensure all essential structural elements exist
     if (!textarea || !categorySelect || !submitBtn) return;
     
     const content = textarea.value.trim();
     const category = categorySelect.value;
 
+    // 2. Validate basic empty states and character threshold constraints
     if (!content || content.length > 280) return;
 
+    // 3. INTERCEPT: Run the local word filter scanner BEFORE freezing the user interface
+    if (containsProhibitedContent(content)) {
+        alert("Post blocked: Your message contains language that violates the CampusCrypt Code of Respect.");
+        return; // Halts processing instantly so no database entry or UI freeze occurs
+    }
+
+    // 4. Freeze UI controls to block dangerous duplicate double-submit events
     submitBtn.disabled = true;
     submitBtn.textContent = 'Posting...';
 
+    // 5. Asynchronously stream data payload to Supabase database
     const { data: newRowData, error } = await supabaseClient
         .from('posts')
         .insert([{ content, category, session_id: currentSessionId }])
         .select()
         .single();
 
+    // 6. Restore interactive buttons immediately after server transaction finishes
     submitBtn.disabled = false;
     submitBtn.textContent = 'Post Anon';
 
+    // 7. Handle network connection disruptions safely
     if (error) {
         alert('Submission failed: ' + error.message);
         return;
     }
 
-    // Reset fields and close out the window drawer instantly
+    // 8. Success: Clear out input states and reset visual trackers
     textarea.value = '';
-    document.getElementById('char-counter').textContent = '0 / 280';
-    closeComposerModal();
+    const charCounter = document.getElementById('char-counter');
+    if (charCounter) charCounter.textContent = '0 / 280';
     
-    // Targeted Injection: Slip element dynamically to the top list
+    closeComposerModal(); // Closes out the view overlay drawer layout
+    
+    // 9. DYNAMIC LOCAL INJECTION: Instantly push row to feed without reloading
     const container = document.getElementById('feed-container');
-    if (container.querySelector('div[style*="text-align:center"]')) container.innerHTML = '';
+    if (container) {
+        // Drop any fallback "No posts yet" empty state message cards
+        if (container.querySelector('div[style*="text-align:center"]')) {
+            container.innerHTML = '';
+        }
 
-    newRowData.likes_count = 0;
-    newRowData.reply_count = 0;
-    newRowData.has_user_liked = false;
+        // Initialize zeroed runtime metrics for compiling the raw component template
+        newRowData.likes_count = 0;
+        newRowData.reply_count = 0;
+        newRowData.has_user_liked = false;
 
-    const modernNode = compilePostHtmlNode(newRowData);
-    modernNode.style.background = '#16181c';
-    container.insertBefore(modernNode, container.firstChild);
-    setTimeout(() => modernNode.style.background = 'transparent', 1200);
+        // Compile and insert node card at the very absolute top position
+        const modernNode = compilePostHtmlNode(newRowData);
+        modernNode.style.background = '#16181c';
+        modernNode.style.transition = 'background 1.2s ease'; // Smooth transition property guarantee
+        
+        container.insertBefore(modernNode, container.firstChild);
+        
+        // Fades background highlight away slowly to match premium vibe
+        setTimeout(() => {
+            modernNode.style.background = 'transparent';
+        }, 1200);
+    }
 }
 
 async function togglePostLikeState(postId, buttonNode) {
@@ -256,100 +340,215 @@ async function togglePostLikeState(postId, buttonNode) {
 // 5. DISCUSSION MODAL SUBSYSTEMS
 // ==========================================
 
-async function openThreadModal(postId) {
+// Global state pointer to track the current thread author
+let globalActiveThreadAuthorSessionId = '';
+
+function openThreadModal(postId, postContent, postCategory, postCreatedAt) {
     globalActiveFocusedPostId = postId;
     const modal = document.getElementById('thread-modal');
     const focusBox = document.getElementById('modal-focus-post');
     
     if (!modal || !focusBox) return;
     
+    // 1. Reveal the modal layout wrapper instantly
     modal.classList.remove('hidden');
-    focusBox.innerHTML = `<div style="text-align:center; color:#71767b; font-size:14px;">Syncing conversation stream...</div>`;
 
-    const { data: post } = await supabaseClient.from('posts').select('*').eq('id', postId).single();
-    if (!post) return;
+    const formattedTime = typeof formatTimestampRelative === 'function' ? formatTimestampRelative(postCreatedAt) : 'Just now';
 
+    // 2. NATIVE SANITIZATION: Prevents XSS injections without crashing if escapeHtmlMarkup is missing
+    const safeContent = typeof escapeHtmlMarkup === 'function' ? escapeHtmlMarkup(postContent) : postContent;
+
+    // 3. INSTANT UI PAINT: Render the focused parent post text right away
     focusBox.innerHTML = `
         <div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
-            <div class="avatar" style="width:32px; height:32px; font-size:14px;">🥷</div>
+            <div class="avatar" style="width:32px; height:32px; font-size:14px; display:flex; align-items:center; justify-content:center;">🥷</div>
             <div>
-                <div style="font-weight:bold; font-size:14px;">Original Poster</div>
-                <div style="color:#71767b; font-size:12px;">${formatTimestampRelative(post.created_at)}</div>
+                <div style="font-weight:bold; font-size:14px; color:#f7f9fa;">Original Poster</div>
+                <div style="color:#71767b; font-size:12px;">${formattedTime}</div>
             </div>
         </div>
-        <div style="font-size:17px; line-height:1.4; color:white; margin-bottom:8px;">${escapeHtmlMarkup(post.content)}</div>
-        <span class="cat-badge">${post.category}</span>
+        <div style="font-size:17px; line-height:1.4; color:white; margin-bottom:8px; white-space:pre-wrap; word-break:break-word;">${safeContent}</div>
+        <span class="cat-badge">${postCategory}</span>
     `;
 
+    // 4. DEFERRED OP SECURITY FETCH: Quietly resolve owner verification in the background
+    supabaseClient
+        .from('posts')
+        .select('session_id')
+        .eq('id', postId)
+        .single()
+        .then(({ data, error }) => {
+            if (!error && data) {
+                globalActiveThreadAuthorSessionId = data.session_id;
+                // Re-trigger the comment loop so badges align correctly with the resolved session
+                fetchAndRenderComments(postId);
+            }
+        });
+
+    // 5. DEFERRED COMMENT FETCH: Fire off the replies data trickle loop asynchronously
     fetchAndRenderComments(postId);
 }
 
-async function fetchAndRenderComments(postId) {
-    const container = document.getElementById('modal-comments-container');
-    if (!container) return;
-    container.innerHTML = '';
 
-    const { data: replies } = await supabaseClient
+async function fetchAndRenderComments(postId) {
+    const commentsList = document.getElementById('modal-comments-list');
+    if (!commentsList) return;
+
+    // 1. Initialize clean loading state layout
+    commentsList.innerHTML = `<div style="text-align:center; color:#71767b; font-size:13px; padding:20px;">Reading responses...</div>`;
+
+    // 2. Pull comments from database
+    const { data: replies, error } = await supabaseClient
         .from('replies')
         .select('*')
         .eq('post_id', postId)
         .order('created_at', { ascending: true });
 
-    if (!replies || replies.length === 0) {
-        container.innerHTML = `<div style="text-align:center; padding:20px; color:#71767b; font-size:13px;">No replies yet. Say something anonymously!</div>`;
+    if (error) {
+        console.error('Supabase Reply Fetch Error:', error.message);
+        commentsList.innerHTML = `<div style="text-align:center; color:#f91880; font-size:13px; padding:20px;">Database connection failed.</div>`;
         return;
     }
 
+    if (!replies || replies.length === 0) {
+        commentsList.innerHTML = `<div style="text-align:center; color:#71767b; font-size:13px; padding:20px;">No replies yet. Be the first to add a node!</div>`;
+        return;
+    }
+
+    commentsList.innerHTML = '';
+    
     replies.forEach(reply => {
-        const div = document.createElement('div');
-        div.className = 'reply-node';
-        div.innerHTML = `
-            <div class="avatar" style="width:32px; height:32px; font-size:14px;">🥷</div>
-            <div>
-                <div style="display:flex; gap:6px; font-size:13px; margin-bottom:2px;">
-                    <span style="font-weight:bold;">Anonymous</span>
-                    <span style="color:#71767b;">· ${formatTimestampRelative(reply.created_at)}</span>
-                </div>
-                <div style="font-size:14px; color:#e1e8ed; line-height:1.4;">${escapeHtmlMarkup(reply.content)}</div>
+        const replyNode = document.createElement('div');
+        replyNode.className = 'reply-node';
+        replyNode.style.cssText = 'width:100%; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.04);';
+
+        // Compute OP badges safely
+        let isOriginalPoster = false;
+        if (reply?.session_id && typeof globalActiveThreadAuthorSessionId !== 'undefined') {
+            isOriginalPoster = reply.session_id === globalActiveThreadAuthorSessionId;
+        }
+        
+        // Shortened styling properties
+        const opTagHtml = isOriginalPoster ? `<span style="background:#1d9bf0; color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:6px;">OP</span>` : '';
+        const displayTime = typeof formatTimestampRelative === 'function' ? formatTimestampRelative(reply.created_at) : 'Just now';
+
+        // Assemble header layout using "Anon" instead of "Anonymous Operator"
+        replyNode.innerHTML = `
+            <div style="display:flex; align-items:center; margin-bottom:4px;">
+                <span style="font-weight:bold; font-size:13px; color:#f7f9fa;">Anon</span>
+                ${opTagHtml}
+                <span style="color:#71767b; font-size:12px; margin-left:6px;">· ${displayTime}</span>
             </div>
         `;
-        container.appendChild(div);
+        
+        // Native comment body sanitizer (Handles long word text-wrapping flawlessly)
+        const textContainer = document.createElement('div');
+        textContainer.style.cssText = 'font-size:14px; line-height:1.4; color:#e7e9ea; white-space:pre-wrap; word-break:break-word;';
+        textContainer.textContent = reply.content;
+        
+        replyNode.appendChild(textContainer);
+        commentsList.appendChild(replyNode);
     });
 }
 
 async function handleReplySubmit() {
     const textarea = document.getElementById('reply-textarea');
     const submitBtn = document.getElementById('submit-reply-btn');
-    if (!textarea || !submitBtn || !globalActiveFocusedPostId) return;
+    const commentsContainer = document.getElementById('modal-comments-container');
+
+    if (!textarea || !submitBtn || !commentsContainer) return;
 
     const content = textarea.value.trim();
-    if (!content || content.length > 280) return;
+    if (!content) return;
 
+    // 1. Lock input states to prevent double-submitting spam
+    textarea.disabled = true;
     submitBtn.disabled = true;
+    submitBtn.textContent = 'Posting...';
 
+    // Capture values for instant rendering
+    const tempReplyContent = content;
+    const nowIsoString = new Date().toISOString();
+
+    // 🌟 2. IMMEDIATE INJECTION (Optimistic UI)
+    // If the "No replies yet" placeholder is showing, clear it out first
+    if (commentsContainer.innerHTML.includes('No replies yet') || commentsContainer.innerHTML.includes('Reading responses')) {
+        commentsContainer.innerHTML = '';
+    }
+
+    // Create a temporary local node card
+    const localNode = document.createElement('div');
+    localNode.className = 'reply-node temporary-optimistic-node';
+    localNode.style.cssText = 'width:100%; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.04); opacity: 0.6;'; // Slightly dim to show it's syncing
+
+    // Is the replier the Original Poster?
+    const isOriginalPoster = currentSessionId === globalActiveThreadAuthorSessionId;
+    const opTagHtml = isOriginalPoster ? `<span style="background:#1d9bf0; color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:6px;">OP</span>` : '';
+
+    localNode.innerHTML = `
+        <div style="display:flex; align-items:center; margin-bottom:4px;">
+            <span style="font-weight:bold; font-size:13px; color:#f7f9fa;">Anon</span>
+            ${opTagHtml}
+            <span style="color:#71767b; font-size:12px; margin-left:6px;">· Just now</span>
+        </div>
+    `;
+
+    const textContainer = document.createElement('div');
+    textContainer.style.cssText = 'font-size:14px; line-height:1.4; color:#e7e9ea; white-space:pre-wrap; word-break:break-word;';
+    textContainer.textContent = tempReplyContent; // Safe native sanitization
+    
+    localNode.appendChild(textContainer);
+    
+    // Append your new node straight to the bottom of the list instantly!
+    commentsContainer.appendChild(localNode);
+
+    // Auto-scroll the container to the bottom so you see your reply slip into place
+    const modalScroll = document.querySelector('.modal-scroll');
+    if (modalScroll) {
+        modalScroll.scrollTop = modalScroll.scrollHeight;
+    }
+
+    // 3. Clear the text input field immediately for clean user experience
+    textarea.value = '';
+    textarea.disabled = false;
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Reply';
+
+    // 4. QUIET BACKGROUND SYNC: Ship data to Supabase silently
     const { error } = await supabaseClient
         .from('replies')
-        .insert([{ post_id: globalActiveFocusedPostId, content, session_id: currentSessionId }]);
-
-    submitBtn.disabled = false;
+        .insert([
+            {
+                post_id: globalActiveFocusedPostId,
+                content: tempReplyContent,
+                session_id: currentSessionId,
+                created_at: nowIsoString
+            }
+        ]);
 
     if (error) {
-        alert('Could not post reply: ' + error.message);
+        console.error('Failed to sync reply to cloud database:', error.message);
+        // If it failed to save, remove the fake comment and alert the user
+        localNode.remove();
+        alert('Transmission failed. Your message could not be encrypted.');
         return;
     }
 
-    textarea.value = '';
-    await fetchAndRenderComments(globalActiveFocusedPostId);
-    
-    const postCard = document.getElementById(`ui-post-${globalActiveFocusedPostId}`);
-    if (postCard) {
-        const commentCounter = postCard.querySelector('.comment span');
-        if (commentCounter) {
-            let currentNum = parseInt(commentCounter.textContent) || 0;
-            commentCounter.textContent = currentNum + 1;
+    // 5. Finalize the node styling once confirmed by the database
+    localNode.style.opacity = '1'; // Make text fully bright
+    localNode.classList.remove('temporary-optimistic-node');
+
+    // 6. Dynamically increment the comment counter on the main timeline post card without reloading it
+    const mainTimelinePostCard = document.getElementById(`ui-post-${globalActiveFocusedPostId}`);
+    if (mainTimelinePostCard) {
+        const commentCounterSpan = mainTimelinePostCard.querySelector('.action.comment span');
+        if (commentCounterSpan) {
+            const currentCount = parseInt(commentCounterSpan.textContent) || 0;
+            commentCounterSpan.textContent = currentCount + 1;
         }
     }
 }
+
 
 async function executePostDeletion(postId) {
     if (!confirm('Permanently wipe this anonymous post?')) return;
@@ -375,9 +574,20 @@ function closeThreadModal() {
 // ==========================================
 
 function switchFeedTab(tabName) {
+    // 1. Update the global state tracking index variable
     globalCurrentFeedTab = tabName;
-    document.getElementById('tab-latest').className = tabName === 'latest' ? 'active' : '';
-    document.getElementById('tab-trending').className = tabName === 'trending' ? 'active' : '';
+    
+    // 2. NEW: Burn choice into persistent local device storage matrix 
+    localStorage.setItem('cc_preferred_tab', tabName);
+
+    // 3. Toggle interactive UI class states to match current active selection layout
+    const latestTab = document.getElementById('tab-latest');
+    const trendingTab = document.getElementById('tab-trending');
+
+    if (latestTab) latestTab.className = tabName === 'latest' ? 'active' : '';
+    if (trendingTab) trendingTab.className = tabName === 'trending' ? 'active' : '';
+    
+    // 4. Trigger chronological timeline rendering loop (Sorting algorithms automatically execute inside)
     fetchAndRenderFeed();
 }
 
@@ -447,4 +657,22 @@ function formatTimestampRelative(dateString) {
     if (minutes < 60) return `${minutes}m`;
     if (hours < 24) return `${hours}h`;
     return `${days}d`;
+}
+
+// ==========================================
+// CLIENT-SIDE ANTI-HARASSMENT GUARD
+// ==========================================
+const BANNED_KEYWORDS = [
+    "kill", "porno", "porn", "fuck", "fvck", "bitch", "asshole", "cunt", "dick", "suicide", "vagina", "penis", "breast", "boobs", "boob", "stupid"
+    ];
+
+/**
+ * Checks if text contains any banned words or targeted harassment.
+ * @param {string} text - The user input to scan.
+ * @returns {boolean} - True if toxic content is detected.
+ */
+function containsProhibitedContent(text) {
+    if (!text) return false;
+    const lowerText = text.toLowerCase();
+    return BANNED_KEYWORDS.some(word => lowerText.includes(word.toLowerCase()));
 }

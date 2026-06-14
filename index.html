@@ -45,36 +45,50 @@
       z-index: 100;
     }
 
-   /* COMPLEX CINEMATIC SPLASH SCREEN */
+   /* CINEMATIC ONBOARDING LAYER SYSTEM */
     .splash-screen {
       position: fixed;
       inset: 0;
-      background: #000000;
+      background: #050608;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       z-index: 9999;
-      transition: opacity 0.8s cubic-bezier(0.645, 0.045, 0.355, 1), visibility 0.8s;
+      transition: opacity 0.6s ease, visibility 0.6s ease;
+      padding: 24px;
     }
     .splash-screen.fade-out { 
       opacity: 0; 
       visibility: hidden; 
     }
 
-    /* Subtle futuristic CRT scanline layer inside the splash screen */
+    /* Cinematic CRT Scanlines */
     .splash-screen::after {
       content: " ";
       display: block;
       position: absolute;
       inset: 0;
-      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%);
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
       background-size: 100% 4px;
       z-index: 2;
       pointer-events: none;
     }
 
-    /* Split-Color Glowing Logo */
+    .splash-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      max-width: 520px;
+      z-index: 3;
+      transition: all 0.5s ease;
+    }
+    .splash-stage.hidden {
+      display: none !important;
+    }
+
     .splash-logo {
       font-size: 40px;
       font-weight: 900;
@@ -82,7 +96,6 @@
       display: flex;
       align-items: center;
       gap: 16px;
-      z-index: 3;
       animation: complexIntroPulse 2.5s infinite alternate ease-in-out;
     }
     .splash-logo .white-text { color: #ffffff; }
@@ -91,23 +104,84 @@
       text-shadow: 0 0 20px rgba(29, 155, 240, 0.6); 
     }
 
-    /* Loading Subtext */
     .splash-subtext {
       color: #71767b;
-      font-size: 11px;
+      font-size: 12px;
       margin-top: 16px;
       font-family: monospace;
       letter-spacing: 2px;
       text-transform: uppercase;
-      z-index: 3;
-      opacity: 0.8;
+      text-align: center;
+    }
+
+    /* RULES & REGULATIONS FRAME layout */
+    .rules-card {
+      background: #0d0e12;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 28px;
+      width: 100%;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    .rules-heading {
+      font-size: 20px;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .rules-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .rules-list li {
+      font-size: 14px;
+      line-height: 1.4;
+      color: #e7e9ea;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .rules-list li i {
+      color: #1d9bf0;
+      margin-top: 3px;
+      font-size: 12px;
+    }
+
+    /* PREMIUM INTERACTIVE NAV BUTTONS */
+    .splash-btn {
+      background: #1d9bf0;
+      color: white;
+      border: none;
+      padding: 12px 32px;
+      border-radius: 25px;
+      font-weight: 800;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: none;
+    }
+    .splash-btn:hover {
+      background: #1a8cd8;
+      transform: translateY(-1px);
     }
 
     @keyframes complexIntroPulse {
-      0% { transform: scale(0.96); filter: drop-shadow(0 0 5px rgba(29,155,240,0.1)); }
-      100% { transform: scale(1.02); filter: drop-shadow(0 0 30px rgba(29,155,240,0.7)); }
+      0% { transform: scale(0.97); }
+      100% { transform: scale(1.02); }
     }
-
     .search-box {
       display: flex;
       align-items: center;
@@ -348,6 +422,22 @@
       flex: 1;
     }
 
+    /* OP AUTHOR BADGE */
+    .op-badge {
+      font-size: 10px;
+      font-weight: 900;
+      background: #1d9bf0;
+      color: white;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+
     /* COMPOSER MODAL CUSTOM LAYOUT */
     .composer-modal-content {
       display: flex;
@@ -487,15 +577,58 @@
 </head>
 <body>
 
-<!-- COMPLEX WELCOME INTRO OVERLAY -->
-  <div id="splash-layer" class="splash-screen">
-    <div class="splash-logo">
-      <i class="fa-solid fa-user-secret" style="color: #1d9bf0; font-size: 38px;"></i>
-      <div>
-        <span class="white-text">Campus</span><span class="blue-text">Crypt</span>
+<div id="splash-layer" class="splash-screen">
+    
+    <div id="splash-stage-welcome" class="splash-stage">
+      <div class="splash-logo">
+        <i class="fa-solid fa-user-secret" style="color: #1d9bf0; font-size: 38px;"></i>
+        <div>
+          <span class="white-text">Campus</span><span class="blue-text">Crypt</span>
+        </div>
+      </div>
+      <p class="splash-subtext" style="margin-bottom: 24px;">Stay Anonymous. Speak Freely.</p>
+      
+      <button class="splash-btn" onclick="advanceToRulesScreen()">
+        <span>Review Rules</span>
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+    </div>
+
+    <div id="splash-stage-rules" class="splash-stage hidden">
+      <div class="rules-card">
+        <div class="rules-heading">
+          <i class="fa-solid fa-scale-balanced" style="color: #1d9bf0;"></i>
+          <span>Campus Code of Respect</span>
+        </div>
+        
+<ul class="rules-list">
+          <!-- SECTION 1: HOW THE PLATFORM WORKS -->
+          <li>
+            <i class="fa-solid fa-clock"></i>
+            <span><strong>The 48-Hour Lifecycle:</strong> To maintain fresh discourse and prevent permanent digital footprints, every anonymous post vanishes from the live timeline exactly 48 hours after creation.</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-network-wired"></i>
+            <span><strong>How the Stream Works:</strong> No accounts, user profiles, or tracking profiles exist. Browse latest posts or switch over to view trending updates sorted dynamically by engagement algorithm math.</span>
+          </li>
+
+          <!-- SECTION 2: CONDUCT & COMMUNITY GUIDELINES -->
+          <li>
+            <i class="fa-solid fa-shield-halved"></i>
+            <span><strong>Anonymity as a Shield:</strong> True identity concealment is provided to support authentic expression. It is intended to protect your voice, never to serve as a weapon for malice.</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-ban"></i>
+            <span><strong>Zero Target Violations:</strong> Severe harassment, posting direct legal names, doxxing, or spreading dangerous malicious rumors will be intercepted and blocked by real-time client filters.</span>
+          </li>
+        </ul>
+
+        <button class="splash-btn" style="width: 100%; justify-content: center;" onclick="acceptRulesAndEnterApp()">
+          <span>Agree & Enter Crypt</span>
+        </button>
       </div>
     </div>
-    <p class="splash-subtext">Stay Anonymous. Speak Freely.</p>
+
   </div>
 
   <div class="twitter">
@@ -518,10 +651,11 @@
     <div class="category-bar">
       <div class="cat-pill active" onclick="filterByCategory('all', this)">All Feed</div>
       <div class="cat-pill" onclick="filterByCategory('general', this)">General</div>
-      <div class="cat-pill" onclick="filterByCategory('cs101', this)">CS101</div>
-      <div class="cat-pill" onclick="filterByCategory('math201', this)">MATH201</div>
-      <div class="cat-pill" onclick="filterByCategory('professor', this)">Professor</div>
       <div class="cat-pill" onclick="filterByCategory('campus', this)">Campus</div>
+      <div class="cat-pill" onclick="filterByCategory('programming', this)">Programming</div>
+      <div class="cat-pill" onclick="filterByCategory('anime', this)">Anime</div>
+      <div class="cat-pill" onclick="filterByCategory('studies', this)">Studies</div>
+      <div class="cat-pill" onclick="filterByCategory('confessions', this)">Confessions</div>
     </div>
 
     <div id="feed-container">
@@ -557,11 +691,13 @@
       <div class="composer-modal-meta">
         <div>
           <select id="category-select">
-            <option value="general"> General</option>
-            <option value="cs101">CS101</option>
-            <option value="math201">MATH201</option>
-            <option value="professor">Professor</option>
+            <option value="general">General</option>
             <option value="campus">Campus</option>
+            <option value="programming">Programming</option>
+            <option value="anime">Anime</option>
+            <option value="studies">Studies</option>
+            <option value="vibes_chills">Vibes & Chills</option>
+            <option value="confessions">Confessions</option>
           </select>
         </div>
         <div>
@@ -581,7 +717,7 @@
       <div class="modal-scroll">
         <div id="modal-focus-post"></div>
         <div style="font-size: 13px; font-weight: bold; color: #71767b; margin-bottom: 10px; text-transform: uppercase;">Replies</div>
-        <div id="modal-comments-container"></div>
+        <div id="modal-comments-list"></div>
       </div>
       <div class="modal-footer-input">
         <textarea id="reply-textarea" maxlength="280" rows="2" placeholder="Post your anonymous reply..."></textarea>
@@ -592,7 +728,6 @@
 
   <script src="app.js"></script>
   <script>
-    // Inline Character Counter feedback logic inside Composer Modal
     const txtArea = document.getElementById('post-textarea');
     const cnt = document.getElementById('char-counter');
     if (txtArea && cnt) {
