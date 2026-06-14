@@ -30,43 +30,104 @@ let globalActiveFocusedPostId = null;
 let currentSessionId = null;
 
 // ==========================================
-// CORE RE-ENGINEERED LIFECYCLE INITIALIZER
+// 1. GLOBAL ONBOARDING SWITCHERS (Exposed directly to HTML)
+// ==========================================
+
+function advanceToRulesScreen() {
+    console.log("👉 Advancing to rules stage...");
+    const welcomeStage = document.getElementById('splash-stage-welcome');
+    const rulesStage = document.getElementById('splash-stage-rules');
+    
+    if (welcomeStage && rulesStage) {
+        welcomeStage.classList.add('hidden');
+        rulesStage.classList.remove('hidden');
+    } else {
+        console.error("❌ Onboarding stage elements could not be found in the DOM.");
+    }
+}
+
+function acceptRulesAndEnterApp() {
+    console.log("🚀 Accepting rules and entering app...");
+    const mainSplashLayer = document.getElementById('splash-layer');
+    const mainAppLayout = document.querySelector('.twitter'); 
+
+    if (!mainSplashLayer) return;
+
+    // Save session tracker string to localStorage memory instantly
+    const newSessionId = 'cc_peer_' + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('cc_session_id', newSessionId);
+    
+    if (typeof currentSessionId !== 'undefined') {
+        currentSessionId = newSessionId;
+    }
+
+    // Prepare main feed timeline layout underneath invisibly
+    if (mainAppLayout) {
+        mainAppLayout.style.opacity = '0';
+        mainAppLayout.classList.remove('hidden');
+        mainAppLayout.style.display = 'block';
+    }
+
+    // Trigger your consolidated CSS transition fade-out class rule
+    mainSplashLayer.classList.add('fade-out');
+
+    // Smoothly bring the main dashboard timeline up into focus
+    setTimeout(() => {
+        if (mainAppLayout) {
+            mainAppLayout.style.transition = 'opacity 0.4s ease';
+            mainAppLayout.style.opacity = '1';
+        }
+    }, 150);
+
+    // Hard stop: Remove splash layout completely from visibility flow
+    setTimeout(() => {
+        mainSplashLayer.classList.add('hidden');
+        mainSplashLayer.style.display = 'none'; 
+        
+        // Load data safely with zero UI race conflicts
+        if (typeof fetchAndRenderFeed === 'function') {
+            fetchAndRenderFeed();
+        }
+    }, 500);
+}
+
+// ==========================================
+// 2. CORE RE-ENGINEERED LIFECYCLE INITIALIZER
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
-    // 1. Attempt to retrieve an existing secure session token tracking ID
+    // Attempt to retrieve an existing encrypted session tracking ID
     const existingSession = localStorage.getItem('cc_session_id');
 
-    // 2. Locate your exact DOM wrappers matching your HTML definitions
     const splashLayer = document.getElementById('splash-layer'); 
     const mainAppLayout = document.querySelector('.twitter'); 
 
-    console.log("CampusCrypt Handshake - Active Session:", existingSession);
+    console.log("🔒 CampusCrypt Handshake - Active Session:", existingSession);
 
     if (existingSession) {
-        // 🌟 SCENARIO A: Authenticated Peer Returning
-        currentSessionId = existingSession;
+        if (typeof currentSessionId !== 'undefined') {
+            currentSessionId = existingSession;
+        }
 
-        // Forcefully eliminate the onboarding layer instantly with zero layout flash
+        // Hide onboarding layer instantly with zero layout flash
         if (splashLayer) {
             splashLayer.classList.add('hidden', 'fade-out');
             splashLayer.style.display = 'none';
         }
 
-        // Forcefully mount and display your main feed timeline dashboard structure
+        // Mount and reveal main feed framework
         if (mainAppLayout) {
             mainAppLayout.classList.remove('hidden');
             mainAppLayout.style.display = 'block'; 
             mainAppLayout.style.opacity = '1';     
         }
 
-        // Stream your data posts onto the timeline interface layout right away
+        // Stream database posts right away
         if (typeof fetchAndRenderFeed === 'function') {
             fetchAndRenderFeed();
         }
 
     } else {
-        // 🌟 SCENARIO B: Brand New User Approaching
-        // Keep the main feed completely unmounted while your welcome animations execute
+        // Brand New User Approaching
         if (mainAppLayout) {
             mainAppLayout.classList.add('hidden');
             mainAppLayout.style.display = 'none';
@@ -78,60 +139,6 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
-
-// ==========================================
-// INTERACTIVE SPLASH ONBOARDING SWITCHERS
-// ==========================================
-function advanceToRulesScreen() {
-    const welcomeStage = document.getElementById('splash-stage-welcome');
-    const rulesStage = document.getElementById('splash-stage-rules');
-    
-    if (welcomeStage && rulesStage) {
-        welcomeStage.classList.add('hidden');
-        rulesStage.classList.remove('hidden');
-    }
-}
-
-function acceptRulesAndEnterApp() {
-    const mainSplashLayer = document.getElementById('splash-layer');
-    const mainAppLayout = document.querySelector('.twitter'); 
-
-    if (!mainSplashLayer) return;
-
-    // 1. Commit the session tracking identifier to permanent memory storage strings
-    const newSessionId = 'cc_peer_' + Math.random().toString(36).substring(2, 15);
-    localStorage.setItem('cc_session_id', newSessionId);
-    currentSessionId = newSessionId;
-
-    // 2. Prepare the main feed timeline framework layout underneath invisibly
-    if (mainAppLayout) {
-        mainAppLayout.style.opacity = '0';
-        mainAppLayout.classList.remove('hidden');
-        mainAppLayout.style.display = 'block';
-    }
-
-    // 3. Trigger your hardware-accelerated fade-out sequence using your exact CSS rules
-    mainSplashLayer.classList.add('fade-out');
-
-    // 4. Smoothly bring the main dashboard timeline up into sharp focus mid-way
-    setTimeout(() => {
-        if (mainAppLayout) {
-            mainAppLayout.style.transition = 'opacity 0.4s ease';
-            mainAppLayout.style.opacity = '1';
-        }
-    }, 150);
-
-    // 5. HARD RE-LOCK: Drop splash layout completely out of rendering space when animation settles
-    setTimeout(() => {
-        mainSplashLayer.classList.add('hidden');
-        mainSplashLayer.style.display = 'none'; 
-        
-        // Load feed post data cards safely with zero user interface lag or loop loops
-        if (typeof fetchAndRenderFeed === 'function') {
-            fetchAndRenderFeed();
-        }
-    }, 500); // Matches your 0.5s CSS transition definitions precisely!
-}
 
 
 

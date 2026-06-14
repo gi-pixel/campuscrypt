@@ -754,14 +754,54 @@
 
   <script src="app.js"></script>
   <script>
-    const txtArea = document.getElementById('post-textarea');
-    const cnt = document.getElementById('char-counter');
-    if (txtArea && cnt) {
-      txtArea.addEventListener('input', () => {
-        cnt.textContent = `${txtArea.value.length} / 280`;
-        cnt.style.color = txtArea.value.length >= 260 ? '#f91880' : '#71767b';
-      });
-    }
+    // Force onboarding switchers into the absolute highest global window space
+    window.advanceToRulesScreen = function() {
+        console.log("👉 Advancing to rules stage...");
+        var welcomeStage = document.getElementById('splash-stage-welcome');
+        var rulesStage = document.getElementById('splash-stage-rules');
+        if (welcomeStage && rulesStage) {
+            welcomeStage.classList.add('hidden');
+            rulesStage.classList.remove('hidden');
+        }
+    };
+
+    window.acceptRulesAndEnterApp = function() {
+        console.log("🚀 Entering CampusCrypt...");
+        var mainSplashLayer = document.getElementById('splash-layer');
+        var mainAppLayout = document.querySelector('.twitter');
+
+        // Save session tracking token immediately
+        var newSessionId = 'cc_peer_' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('cc_session_id', newSessionId);
+        if (typeof currentSessionId !== 'undefined') currentSessionId = newSessionId;
+
+        if (mainAppLayout) {
+            mainAppLayout.style.opacity = '0';
+            mainAppLayout.classList.remove('hidden');
+            mainAppLayout.style.display = 'block';
+        }
+
+        if (mainSplashLayer) {
+            mainSplashLayer.classList.add('fade-out');
+        }
+
+        setTimeout(function() {
+            if (mainAppLayout) {
+                mainAppLayout.style.transition = 'opacity 0.4s ease';
+                mainAppLayout.style.opacity = '1';
+            }
+        }, 150);
+
+        setTimeout(function() {
+            if (mainSplashLayer) {
+                mainSplashLayer.classList.add('hidden');
+                mainSplashLayer.style.display = 'none';
+            }
+            if (typeof fetchAndRenderFeed === 'function') {
+                fetchAndRenderFeed();
+            }
+        }, 500);
+    };
   </script>
 </body>
 </html>
