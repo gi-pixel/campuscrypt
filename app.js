@@ -454,9 +454,14 @@ async function fetchAndRenderComments(postId) {
 async function handleReplySubmit() {
     const textarea = document.getElementById('reply-textarea');
     const submitBtn = document.getElementById('submit-reply-btn');
-    const commentsContainer = document.getElementById('modal-comments-container');
+    
+    // 🌟 FIXED: Target 'modal-comments-list' to match your actual HTML template ID exactly
+    const commentsContainer = document.getElementById('modal-comments-list');
 
-    if (!textarea || !submitBtn || !commentsContainer) return;
+    if (!textarea || !submitBtn || !commentsContainer) {
+        console.error("Missing critical DOM elements in thread modal.");
+        return;
+    }
 
     const content = textarea.value.trim();
     if (!content) return;
@@ -470,8 +475,8 @@ async function handleReplySubmit() {
     const tempReplyContent = content;
     const nowIsoString = new Date().toISOString();
 
-    // 🌟 2. IMMEDIATE INJECTION (Optimistic UI)
-    // If the "No replies yet" placeholder is showing, clear it out first
+    // 2. IMMEDIATE INJECTION (Optimistic UI)
+    // Clear out placeholder messages if present
     if (commentsContainer.innerHTML.includes('No replies yet') || commentsContainer.innerHTML.includes('Reading responses')) {
         commentsContainer.innerHTML = '';
     }
@@ -479,7 +484,7 @@ async function handleReplySubmit() {
     // Create a temporary local node card
     const localNode = document.createElement('div');
     localNode.className = 'reply-node temporary-optimistic-node';
-    localNode.style.cssText = 'width:100%; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.04); opacity: 0.6;'; // Slightly dim to show it's syncing
+    localNode.style.cssText = 'width:100%; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.04); opacity: 0.6;'; 
 
     // Is the replier the Original Poster?
     const isOriginalPoster = currentSessionId === globalActiveThreadAuthorSessionId;
@@ -495,7 +500,7 @@ async function handleReplySubmit() {
 
     const textContainer = document.createElement('div');
     textContainer.style.cssText = 'font-size:14px; line-height:1.4; color:#e7e9ea; white-space:pre-wrap; word-break:break-word;';
-    textContainer.textContent = tempReplyContent; // Safe native sanitization
+    textContainer.textContent = tempReplyContent; 
     
     localNode.appendChild(textContainer);
     
@@ -528,17 +533,16 @@ async function handleReplySubmit() {
 
     if (error) {
         console.error('Failed to sync reply to cloud database:', error.message);
-        // If it failed to save, remove the fake comment and alert the user
         localNode.remove();
         alert('Transmission failed. Your message could not be encrypted.');
         return;
     }
 
     // 5. Finalize the node styling once confirmed by the database
-    localNode.style.opacity = '1'; // Make text fully bright
+    localNode.style.opacity = '1'; 
     localNode.classList.remove('temporary-optimistic-node');
 
-    // 6. Dynamically increment the comment counter on the main timeline post card without reloading it
+    // 6. Dynamically increment the comment counter on the main timeline post card
     const mainTimelinePostCard = document.getElementById(`ui-post-${globalActiveFocusedPostId}`);
     if (mainTimelinePostCard) {
         const commentCounterSpan = mainTimelinePostCard.querySelector('.action.comment span');
