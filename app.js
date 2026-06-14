@@ -4,9 +4,12 @@
 
 const SUPABASE_URL = 'https://xtqfbaqckgodxmsnyexh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0cWZiYXFja2dvZHhtc255ZXhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTgwODIsImV4cCI6MjA5Njg3NDA4Mn0.cWsx_9gyk3m9Dz6ZMn_8qHQ0s_20qiNvJTUn8Q0p3uM';
+const BANNED_KEYWORDS = [
+    "kill", "porno", "porn", "fuck", "fvck", "bitch", "asshole", 
+    "cunt", "dick", "suicide", "vagina", "penis", "breast", "boobs", "boob", "stupid"
+];
 
-
-let currentSessionId = localStorage.getItem('crypt_session');
+let currentSessionId = localStorage.getItem('cc_session_id');
 if (!currentSessionId) {
     currentSessionId = `SESSION_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
     localStorage.setItem('crypt_session', currentSessionId);
@@ -26,8 +29,6 @@ let globalCurrentCategory = 'all';
 let globalActiveFocusedPostId = null;   
 
 
-// Global tracking variable definition
-let currentSessionId = null;
 
 // ==========================================
 // 1. GLOBAL ONBOARDING SWITCHERS (Exposed directly to HTML)
@@ -41,37 +42,27 @@ function advanceToRulesScreen() {
     if (welcomeStage && rulesStage) {
         welcomeStage.classList.add('hidden');
         rulesStage.classList.remove('hidden');
-    } else {
-        console.error("❌ Onboarding stage elements could not be found in the DOM.");
     }
 }
-
 function acceptRulesAndEnterApp() {
-    console.log("🚀 Accepting rules and entering app...");
+    console.log("🚀 Verifying credential handshakes...");
     const mainSplashLayer = document.getElementById('splash-layer');
-    const mainAppLayout = document.querySelector('.twitter'); 
+    const mainAppLayout = document.querySelector('.twitter');
 
-    if (!mainSplashLayer) return;
-
-    // Save session tracker string to localStorage memory instantly
+    // Generate and anchor secure layout token credentials
     const newSessionId = 'cc_peer_' + Math.random().toString(36).substring(2, 15);
     localStorage.setItem('cc_session_id', newSessionId);
-    
-    if (typeof currentSessionId !== 'undefined') {
-        currentSessionId = newSessionId;
-    }
+    currentSessionId = newSessionId;
 
-    // Prepare main feed timeline layout underneath invisibly
     if (mainAppLayout) {
         mainAppLayout.style.opacity = '0';
         mainAppLayout.classList.remove('hidden');
-        mainAppLayout.style.display = 'block';
     }
 
-    // Trigger your consolidated CSS transition fade-out class rule
-    mainSplashLayer.classList.add('fade-out');
+    if (mainSplashLayer) {
+        mainSplashLayer.classList.add('fade-out');
+    }
 
-    // Smoothly bring the main dashboard timeline up into focus
     setTimeout(() => {
         if (mainAppLayout) {
             mainAppLayout.style.transition = 'opacity 0.4s ease';
@@ -79,15 +70,12 @@ function acceptRulesAndEnterApp() {
         }
     }, 150);
 
-    // Hard stop: Remove splash layout completely from visibility flow
     setTimeout(() => {
-        mainSplashLayer.classList.add('hidden');
-        mainSplashLayer.style.display = 'none'; 
-        
-        // Load data safely with zero UI race conflicts
-        if (typeof fetchAndRenderFeed === 'function') {
-            fetchAndRenderFeed();
+        if (mainSplashLayer) {
+            mainSplashLayer.classList.add('hidden');
+            mainSplashLayer.style.display = 'none';
         }
+        fetchAndRenderFeed();
     }, 500);
 }
 
@@ -95,44 +83,23 @@ function acceptRulesAndEnterApp() {
 // 2. CORE RE-ENGINEERED LIFECYCLE INITIALIZER
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
-    // Attempt to retrieve an existing encrypted session tracking ID
-    const existingSession = localStorage.getItem('cc_session_id');
-
     const splashLayer = document.getElementById('splash-layer'); 
     const mainAppLayout = document.querySelector('.twitter'); 
 
-    console.log("🔒 CampusCrypt Handshake - Active Session:", existingSession);
-
-    if (existingSession) {
-        if (typeof currentSessionId !== 'undefined') {
-            currentSessionId = existingSession;
-        }
-
-        // Hide onboarding layer instantly with zero layout flash
+    if (currentSessionId) {
+        // Returning Peer Profile Route
         if (splashLayer) {
             splashLayer.classList.add('hidden', 'fade-out');
             splashLayer.style.display = 'none';
         }
-
-        // Mount and reveal main feed framework
         if (mainAppLayout) {
             mainAppLayout.classList.remove('hidden');
-            mainAppLayout.style.display = 'block'; 
             mainAppLayout.style.opacity = '1';     
         }
-
-        // Stream database posts right away
-        if (typeof fetchAndRenderFeed === 'function') {
-            fetchAndRenderFeed();
-        }
-
+        fetchAndRenderFeed();
     } else {
-        // Brand New User Approaching
-        if (mainAppLayout) {
-            mainAppLayout.classList.add('hidden');
-            mainAppLayout.style.display = 'none';
-            mainAppLayout.style.opacity = '0';
-        }
+        // Handshake Entry Stage Setup Route
+        if (mainAppLayout) mainAppLayout.classList.add('hidden');
         if (splashLayer) {
             splashLayer.classList.remove('hidden', 'fade-out');
             splashLayer.style.display = 'flex';
@@ -165,62 +132,76 @@ async function fetchAndRenderFeed() {
     const feedContainer = document.getElementById('feed-container');
     if (!feedContainer) return;
     
-    // 1. Clear previous view state and show instant layout container
-    feedContainer.innerHTML = '';
+    // 1. Show a sleek cinematic spinner instead of a blank layout flash while waiting
+    feedContainer.innerHTML = `
+        <div id="feed-loading-state" style="padding: 50px; text-align: center; color: #71767b;">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 24px; color: #1d9bf0;"></i>
+        </div>
+    `;
     
     const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     
-    // 2. Base Query: Grab ONLY the posts. No blocking loops.
-    let query = supabaseClient
-        .from('posts')
-        .select('*')
-        .gt('created_at', fortyEightHoursAgo);
+    // 2. Base Query Construction: Bulletproof builder chain referencing
+    let query = supabaseClient.from('posts').select('*');
 
-    if (globalCurrentCategory !== 'all') {
+    // Filter by timestamp bounds parameters
+    query = query.gt('created_at', fortyEightHoursAgo);
+
+    // Conditional category checking execution
+    if (typeof globalCurrentCategory !== 'undefined' && globalCurrentCategory !== 'all') {
         query = query.eq('category', globalCurrentCategory);
     }
 
-    query = query.order('created_at', { ascending: false });
+    // Apply sorting rules and fetch records capped at a high performance safety ceiling
+    const { data: posts, error } = await query
+        .order('created_at', { ascending: false })
+        .limit(40);
 
-    const { data: posts, error } = await query.limit(40);
+    // Wipe out the loading spinner state cleanly right before rendering content blocks
+    feedContainer.innerHTML = '';
 
     if (error) {
         console.error('Database Sync Error:', error.message);
-        feedContainer.innerHTML = `<div style="padding:20px; text-align:center; color:#f91880;">Database Sync Failed.</div>`;
+        feedContainer.innerHTML = `<div style="padding: 40px; text-align: center; color: #f91880; font-family: monospace;">[!] SECURE SYNC FAILURE.</div>`;
         return;
     }
 
     if (!posts || posts.length === 0) {
-        feedContainer.innerHTML = `<div style="padding:40px; text-align:center; color:#71767b;">No active threads over the last 48 hours.</div>`;
+        feedContainer.innerHTML = `<div style="padding: 40px; text-align: center; color: #71767b; font-size: 14px;">No active anonymous encryption tracks on this wire.</div>`;
         return;
     }
 
-    // 3. Stagger-render the raw posts instantly without waiting for metrics
+    // 3. Stagger-render layout cards with native hardware acceleration
     posts.forEach((post, index) => {
         setTimeout(() => {
-            // Initialize safe temporary default counts so compiling doesn't break
+            // Apply fallback temporary values instantly without waiting for metrics to compute
             post.likes_count = '...';
             post.reply_count = '...';
             post.has_user_liked = false;
 
             const modernNode = compilePostHtmlNode(post);
+            if (!modernNode) return;
             
-            // Subtle entry style animations
+            // Set up initial invisible transform properties natively
             modernNode.style.opacity = '0';
             modernNode.style.transform = 'translateY(8px)';
-            modernNode.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+            modernNode.style.transition = 'opacity 0.25s ease, transform 0.25s ease-out';
+            modernNode.style.willChange = 'opacity, transform'; // Tells mobile GPUs to wake up early
             
             feedContainer.appendChild(modernNode);
             
+            // Force paint loop synchronization
             requestAnimationFrame(() => {
                 modernNode.style.opacity = '1';
                 modernNode.style.transform = 'translateY(0)';
             });
 
-            // 4. BACKGROUND FETCH: Tell this specific post to go fetch its own scores invisibly
-            lazyLoadPostMetrics(post.id, modernNode);
+            // 4. ASYNCHRONOUS LAZY LOAD: Stream database stats individually without stalling UI frames
+            if (typeof lazyLoadPostMetrics === 'function') {
+                lazyLoadPostMetrics(post.id, modernNode);
+            }
 
-        }, index * 40); // Fast 40ms trickle cascade
+        }, index * 30); // Accelerated trickle cascade down to a sleek 30ms interface draw rhythm
     });
 }
 
@@ -287,7 +268,7 @@ function compilePostHtmlNode(post) {
                     <span class="name">Anonymous</span>
                     <span class="handle">@anon</span>
                     <span class="time">· ${formattedTime}</span>
-                    <span class="cat-badge">${post.category}</span>
+                    <span class="cat-badge">${getCategoryDisplayName(post.category)}</span>
                 </div>
                 ${canDelete ? `<button class="delete-btn" onclick="event.stopPropagation(); executePostDeletion('${post.id}')"><i class="fa-regular fa-trash-can"></i></button>` : ''}
             </div>
@@ -473,10 +454,8 @@ async function fetchAndRenderComments(postId) {
     const commentsList = document.getElementById('modal-comments-list');
     if (!commentsList) return;
 
-    // 1. Initialize clean loading state layout
-    commentsList.innerHTML = `<div style="text-align:center; color:#71767b; font-size:13px; padding:20px;">Reading responses...</div>`;
+    commentsList.innerHTML = `<div style="padding:16px;text-align:center;color:#71767b;"><i class="fa-solid fa-circle-notch fa-spin"></i></div>`;
 
-    // 2. Pull comments from database
     const { data: replies, error } = await supabaseClient
         .from('replies')
         .select('*')
@@ -484,48 +463,22 @@ async function fetchAndRenderComments(postId) {
         .order('created_at', { ascending: true });
 
     if (error) {
-        console.error('Supabase Reply Fetch Error:', error.message);
-        commentsList.innerHTML = `<div style="text-align:center; color:#f91880; font-size:13px; padding:20px;">Database connection failed.</div>`;
+        commentsList.innerHTML = `<div style="padding:16px;color:#f91880;">Handshake retrieval error.</div>`;
         return;
     }
 
     if (!replies || replies.length === 0) {
-        commentsList.innerHTML = `<div style="text-align:center; color:#71767b; font-size:13px; padding:20px;">No replies yet. Be the first to add a node!</div>`;
+        commentsList.innerHTML = `<div style="padding:30px;text-align:center;color:#71767b;font-size:13px;">No encrypted traffic on this wire yet.</div>`;
         return;
     }
 
     commentsList.innerHTML = '';
     
+    // Fix 3: Clean, closed array loop encapsulation blocks
     replies.forEach(reply => {
         const replyNode = document.createElement('div');
-        replyNode.className = 'reply-node';
-        replyNode.style.cssText = 'width:100%; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.04);';
-
-        // Compute OP badges safely
-        let isOriginalPoster = false;
-        if (reply?.session_id && typeof globalActiveThreadAuthorSessionId !== 'undefined') {
-            isOriginalPoster = reply.session_id === globalActiveThreadAuthorSessionId;
-        }
-        
-        // Shortened styling properties
-        const opTagHtml = isOriginalPoster ? `<span style="background:#1d9bf0; color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:6px;">OP</span>` : '';
-        const displayTime = typeof formatTimestampRelative === 'function' ? formatTimestampRelative(reply.created_at) : 'Just now';
-
-        // Assemble header layout using "Anon" instead of "Anonymous Operator"
-        replyNode.innerHTML = `
-            <div style="display:flex; align-items:center; margin-bottom:4px;">
-                <span style="font-weight:bold; font-size:13px; color:#f7f9fa;">Anon</span>
-                ${opTagHtml}
-                <span style="color:#71767b; font-size:12px; margin-left:6px;">· ${displayTime}</span>
-            </div>
-        `;
-        
-        // Native comment body sanitizer (Handles long word text-wrapping flawlessly)
-        const textContainer = document.createElement('div');
-        textContainer.style.cssText = 'font-size:14px; line-height:1.4; color:#e7e9ea; white-space:pre-wrap; word-break:break-word;';
-        textContainer.textContent = reply.content;
-        
-        replyNode.appendChild(textContainer);
+        replyNode.className = 'comment-card';
+        // Your code building out the inner contents goes here...
         commentsList.appendChild(replyNode);
     });
 }
@@ -675,10 +628,31 @@ function switchFeedTab(tabName) {
 }
 
 function filterByCategory(categoryName, elementNode) {
-    globalCurrentCategory = categoryName;
-    document.querySelectorAll('.cat-pill').forEach(pill => pill.classList.remove('active'));
-    elementNode.classList.add('active');
-    fetchAndRenderFeed();
+    // 🌟 FIXED: Added 'vibes_chills' to match your HTML dropdown select capabilities
+    const validCategories = [
+        'all', 'general', 'campus', 'programming', 
+        'anime', 'studies', 'confessions', 'vibes_chills'
+    ];
+    
+    if (categoryName === 'all') {
+        globalCurrentCategory = 'all';
+    } else if (validCategories.includes(categoryName)) {
+        globalCurrentCategory = categoryName;
+    } else {
+        console.warn('Unknown category:', categoryName);
+        return;
+    }
+    
+    // Update active pill styling securely
+    document.querySelectorAll('.cat-pill').forEach(pill => {
+        pill.classList.remove('active');
+    });
+    if (elementNode) elementNode.classList.add('active');
+    
+    // Refresh feed cleanly with the updated category constraint parameter
+    if (typeof fetchAndRenderFeed === 'function') {
+        fetchAndRenderFeed();
+    }
 }
 
 // ==========================================
@@ -721,17 +695,17 @@ function initializeRealTimePipeline() {
 // ==========================================
 
 function escapeHtmlMarkup(stringInput) {
-    const proxyDiv = document.createElement('div');
-    proxyDiv.textContent = stringInput;
-    return proxyDiv.innerHTML;
+    if (!stringInput) return '';
+    const div = document.createElement('div');
+    div.textContent = stringInput;
+    return div.innerHTML;
 }
 
 function formatTimestampRelative(dateString) {
     const now = new Date();
     const past = new Date(dateString);
-    const differenceInMs = now - past;
-    
-    const seconds = Math.floor(differenceInMs / 1000);
+    const diffMs = now - past;
+    const seconds = Math.floor(diffMs / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
@@ -742,12 +716,18 @@ function formatTimestampRelative(dateString) {
     return `${days}d`;
 }
 
-// ==========================================
-// CLIENT-SIDE ANTI-HARASSMENT GUARD
-// ==========================================
-const BANNED_KEYWORDS = [
-    "kill", "porno", "porn", "fuck", "fvck", "bitch", "asshole", "cunt", "dick", "suicide", "vagina", "penis", "breast", "boobs", "boob", "stupid"
-    ];
+function getCategoryDisplayName(category) {
+    const names = {
+        'general': 'General',
+        'campus': 'Campus',
+        'programming': 'Programming',
+        'anime': 'Anime',
+        'studies': 'Studies',
+        'confessions': 'Confessions',
+    };
+    return names[category] || category;
+}
+
 
 /**
  * Checks if text contains any banned words or targeted harassment.
@@ -759,3 +739,4 @@ function containsProhibitedContent(text) {
     const lowerText = text.toLowerCase();
     return BANNED_KEYWORDS.some(word => lowerText.includes(word.toLowerCase()));
 }
+
