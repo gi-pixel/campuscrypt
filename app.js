@@ -35,7 +35,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // MATCHED TO YOUR HTML: Grab your true outer wrapper layer ID
     const splashLayer = document.getElementById('splash-layer'); 
-    const mainAppLayout = document.getElementById('main-app-layout'); // Ensure this matches your timeline page ID layout wrapper!
+    const mainAppLayout = document.querySelector('.twitter');
 
     if (existingSession) {
         // SCENARIO A: Authenticated Peer Returning
@@ -70,8 +70,7 @@ function advanceToRulesScreen() {
 
 function acceptRulesAndEnterApp() {
     const mainSplashLayer = document.getElementById('splash-layer');
-    const mainAppLayout = document.getElementById('main-app-layout');
-
+    const mainAppLayout = document.querySelector('.twitter');
     if (!mainSplashLayer) return;
 
     // 1. Commit the session verification string to memory instantly
@@ -222,7 +221,6 @@ async function lazyLoadPostMetrics(postId, postNodeElement) {
             likeIcon.classList.add('liked'); // Highlights heart/upvote if they liked it previously
         }
 
-        // Optional: If you use the trending tab sorting engine, store the computed ranking score on the element data attribute
         postNodeElement.dataset.trendingScore = likesCount + (repliesCount * 2);
 
     } catch (err) {
@@ -243,7 +241,6 @@ function compilePostHtmlNode(post) {
     const likeActiveStateClass = post.has_user_liked ? 'liked' : '';
     const safeContent = typeof escapeHtmlMarkup === 'function' ? escapeHtmlMarkup(post.content) : post.content;
 
-    // 🌟 RE-ENGINEERED WIRE-UP: Pass pre-fetched data layers directly to the click engine
     postCard.addEventListener('click', () => {
         openThreadModal(post.id, post.content, post.category, post.created_at);
     });
