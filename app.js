@@ -26,32 +26,56 @@ let globalCurrentCategory = 'all';
 let globalActiveFocusedPostId = null;   
 
 
+// Global tracking variable definition
+let currentSessionId = null;
+
 // ==========================================
 // CORE RE-ENGINEERED LIFECYCLE INITIALIZER
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
-    // 1. Attempt to retrieve an existing encrypted session tracking ID
+    // 1. Attempt to retrieve an existing secure session token tracking ID
     const existingSession = localStorage.getItem('cc_session_id');
 
-    // MATCHED TO YOUR HTML: Grab your true outer wrapper layer ID
+    // 2. Locate your exact DOM wrappers matching your HTML definitions
     const splashLayer = document.getElementById('splash-layer'); 
-    const mainAppLayout = document.querySelector('.twitter');
+    const mainAppLayout = document.querySelector('.twitter'); 
+
+    console.log("🔒 CampusCrypt Handshake - Active Session:", existingSession);
 
     if (existingSession) {
-        // SCENARIO A: Authenticated Peer Returning
+        // 🌟 SCENARIO A: Authenticated Peer Returning
         currentSessionId = existingSession;
 
-        // Hide the onboarding splash block and show your timeline app layout instantly
-        if (splashLayer) splashLayer.classList.add('hidden');
-        if (mainAppLayout) mainAppLayout.classList.remove('hidden');
+        // Forcefully eliminate the onboarding layer instantly with zero layout flash
+        if (splashLayer) {
+            splashLayer.classList.add('hidden', 'fade-out');
+            splashLayer.style.display = 'none';
+        }
 
-        // Fire off your ultra-fast optimized feed renderer right away!
-        fetchAndRenderFeed();
+        // Forcefully mount and display your main feed timeline dashboard structure
+        if (mainAppLayout) {
+            mainAppLayout.classList.remove('hidden');
+            mainAppLayout.style.display = 'block'; 
+            mainAppLayout.style.opacity = '1';     
+        }
+
+        // Stream your data posts onto the timeline interface layout right away
+        if (typeof fetchAndRenderFeed === 'function') {
+            fetchAndRenderFeed();
+        }
 
     } else {
-        // SCENARIO B: Brand New User Approaching
-        if (mainAppLayout) mainAppLayout.classList.add('hidden');
-        if (splashLayer) splashLayer.classList.remove('hidden');
+        // 🌟 SCENARIO B: Brand New User Approaching
+        // Keep the main feed completely unmounted while your welcome animations execute
+        if (mainAppLayout) {
+            mainAppLayout.classList.add('hidden');
+            mainAppLayout.style.display = 'none';
+            mainAppLayout.style.opacity = '0';
+        }
+        if (splashLayer) {
+            splashLayer.classList.remove('hidden', 'fade-out');
+            splashLayer.style.display = 'flex';
+        }
     }
 });
 
@@ -70,24 +94,26 @@ function advanceToRulesScreen() {
 
 function acceptRulesAndEnterApp() {
     const mainSplashLayer = document.getElementById('splash-layer');
-    const mainAppLayout = document.querySelector('.twitter');
+    const mainAppLayout = document.querySelector('.twitter'); 
+
     if (!mainSplashLayer) return;
 
-    // 1. Commit the session verification string to memory instantly
+    // 1. Commit the session tracking identifier to permanent memory storage strings
     const newSessionId = 'cc_peer_' + Math.random().toString(36).substring(2, 15);
     localStorage.setItem('cc_session_id', newSessionId);
     currentSessionId = newSessionId;
 
-    // 2. Clear any hidden classes from the timeline layout underneath so it mounts invisibly
+    // 2. Prepare the main feed timeline framework layout underneath invisibly
     if (mainAppLayout) {
         mainAppLayout.style.opacity = '0';
         mainAppLayout.classList.remove('hidden');
+        mainAppLayout.style.display = 'block';
     }
 
-    // 3. Trigger the unified CSS transition fade-out sequence
+    // 3. Trigger your hardware-accelerated fade-out sequence using your exact CSS rules
     mainSplashLayer.classList.add('fade-out');
 
-    // 4. Smoothly bring the main dashboard timeline up into focus
+    // 4. Smoothly bring the main dashboard timeline up into sharp focus mid-way
     setTimeout(() => {
         if (mainAppLayout) {
             mainAppLayout.style.transition = 'opacity 0.4s ease';
@@ -95,15 +121,16 @@ function acceptRulesAndEnterApp() {
         }
     }, 150);
 
-    // 5. Hard stop: Remove the splash layer completely from layout visibility after fade finishes
+    // 5. HARD RE-LOCK: Drop splash layout completely out of rendering space when animation settles
     setTimeout(() => {
-        mainSplashLayer.style.display = 'none'; // Lockout complete!
+        mainSplashLayer.classList.add('hidden');
+        mainSplashLayer.style.display = 'none'; 
         
-        // Load data safely with zero UI race conflicts
+        // Load feed post data cards safely with zero user interface lag or loop loops
         if (typeof fetchAndRenderFeed === 'function') {
             fetchAndRenderFeed();
         }
-    }, 500);
+    }, 500); // Matches your 0.5s CSS transition definitions precisely!
 }
 
 

@@ -583,6 +583,22 @@
       color: white;
       cursor: pointer;
     }
+
+      /* ==========================================
+    STATE SYNCHRONIZATION OVERRIDES
+    ========================================== */
+
+  /* Universal Utility Class for forcing layout removal */
+  .hidden {
+    display: none !important;
+  }
+
+  /* Force the twitter timeline framework container to match standard hidden rules by default */
+  .twitter.hidden {
+    display: none !important;
+    opacity: 0 !important;
+  }
+  
   </style>
 </head>
 <body>
