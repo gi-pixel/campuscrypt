@@ -97,6 +97,10 @@ window.addEventListener('DOMContentLoaded', () => {
             mainAppLayout.style.opacity = '1';     
         }
         fetchAndRenderFeed();
+        
+        //  ADD REAL-TIME SUBSCRIPTIONS HERE (after feed loads)
+        initRealtimeSubscriptions();
+        
     } else {
         // Handshake Entry Stage Setup Route
         if (mainAppLayout) mainAppLayout.classList.add('hidden');
@@ -745,3 +749,146 @@ function containsProhibitedContent(text) {
     return BANNED_KEYWORDS.some(word => lowerText.includes(word.toLowerCase()));
 }
 
+// ==========================================
+// REAL-TIME WEBSOCKET SUBSCRIPTIONS
+// ==========================================
+
+function initRealtimeSubscriptions() {
+    
+    // 1. Subscribe to NEW POSTS
+    supabaseClient
+        .channel('posts-channel')
+        .on('postgres_changes', 
+            { event: 'INSERT', schema: 'public', table: 'posts' }, 
+            (payload) => {
+                console.log('📡 New post broadcast:', payload.new);
+                const newPost = payload.new;
+                
+                // Don't add if current user just posted
+                if (newPost.session_id === currentSessionId) return;
+                
+                // Check category filter
+                if (globalCurrentCategory !== 'all' && newPost.category !== globalCurrentCategory) return;
+                
+                // Only show on Latest tab
+                if (globalCurrentFeedTab !== 'latest') return;
+                
+                const container = document.getElementById('feed-container');
+                if (!container) return;
+                
+                // Remove empty state
+                if (container.children.length === 1 && container.querySelector('div[style*="text-align:center"]')) {
+                    container.innerHTML = '';
+                }
+                
+                newPost.likes_count = newPost.likes_count || 0;
+                newPost.reply_count = newPost.reply_count || 0;
+                
+                const postNode = compilePostHtmlNode(newPost);
+                if (postNode) {
+                    postNode.style.background = '#1d9bf020';
+                    container.insertBefore(postNode, container.firstChild);
+                    setTimeout(() => { postNode.style.background = ''; }, 2000);
+                }
+            }
+        )
+        .subscribe((status) => {
+            console.log('Posts channel status:', status);
+        });
+    
+    // 2. Subscribe to NEW REPLIES
+    supabaseClient
+        .channel('replies-channel')
+        .on('postgres_changes', 
+            { event: 'INSERT', schema: 'public', table: 'replies' }, 
+            async (payload) => {
+                console.log('📡 New reply broadcast:', payload.new);
+                const newReply = payload.new;
+                
+                // Skip if current user just replied
+                if (newReply.session_id === currentSessionId) return;
+                
+                // If thread modal is open for this post, add reply live
+                if (globalActiveFocusedPostId === newReply.post_id) {
+                    // Fetch OP session for badge
+                    const { data: postData } = await supabaseClient
+                        .from('posts')
+                        .select('session_id')
+                        .eq('id', newReply.post_id)
+                        .single();
+                    
+                    const isOP = postData?.session_id === newReply.session_id;
+                    appendReplyToModal(newReply, isOP);
+                }
+                
+                // Update reply count on timeline card
+                const timelineCard = document.getElementById(`ui-post-${newReply.post_id}`);
+                if (timelineCard) {
+                    const replySpan = timelineCard.querySelector('.action.comment span');
+                    if (replySpan) {
+                        const currentCount = parseInt(replySpan.textContent) || 0;
+                        replySpan.textContent = currentCount + 1;
+                    }
+                }
+            }
+        )
+        .subscribe((status) => {
+            console.log('Replies channel status:', status);
+        });
+    
+    // 3. Subscribe to POST UPDATES (likes, replies count)
+    supabaseClient
+        .channel('posts-update-channel')
+        .on('postgres_changes', 
+            { event: 'UPDATE', schema: 'public', table: 'posts' }, 
+            (payload) => {
+                console.log('📡 Post update broadcast:', payload.new);
+                const updatedPost = payload.new;
+                
+                const postCard = document.getElementById(`ui-post-${updatedPost.id}`);
+                if (postCard) {
+                    const likeSpan = postCard.querySelector('.like-counter-val');
+                    if (likeSpan) likeSpan.textContent = updatedPost.likes_count || 0;
+                    const replySpan = postCard.querySelector('.action.comment span');
+                    if (replySpan) replySpan.textContent = updatedPost.reply_count || 0;
+                }
+            }
+        )
+        .subscribe();
+}
+
+// Helper function to append reply to open modal
+function appendReplyToModal(reply, isOP) {
+    const commentsContainer = document.getElementById('modal-comments-list');
+    if (!commentsContainer) return;
+    
+    // Remove empty state if present
+    if (commentsContainer.innerHTML.includes('No replies yet') || 
+        commentsContainer.innerHTML.includes('Loading replies')) {
+        commentsContainer.innerHTML = '';
+    }
+    
+    const replyNode = document.createElement('div');
+    replyNode.className = 'reply-node';
+    replyNode.style.cssText = 'width:100%; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.04);';
+    
+    const opTagHtml = isOP ? '<span class="op-badge" style="background:#1d9bf0; color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:6px;">OP</span>' : '';
+    const displayTime = formatTimestampRelative(reply.created_at);
+    
+    replyNode.innerHTML = `
+        <div style="display:flex; align-items:center; margin-bottom:4px;">
+            <span style="font-weight:bold; font-size:13px; color:#f7f9fa;">Anonymous</span>
+            ${opTagHtml}
+            <span style="color:#71767b; font-size:12px; margin-left:6px;">· ${displayTime}</span>
+        </div>
+        <div style="font-size:14px; line-height:1.4; color:#e7e9ea; white-space:pre-wrap; word-break:break-word;">${escapeHtmlMarkup(reply.content)}</div>
+    `;
+    
+    commentsContainer.appendChild(replyNode);
+    
+    // Auto-scroll to bottom
+    const modalScroll = document.querySelector('.modal-scroll');
+    if (modalScroll) {
+        modalScroll.scrollTop = modalScroll.scrollHeight;
+    }
+}
