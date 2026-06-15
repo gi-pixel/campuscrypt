@@ -173,36 +173,33 @@ async function fetchAndRenderFeed() {
 
     // 3. Stagger-render layout cards with native hardware acceleration
     posts.forEach((post, index) => {
-        setTimeout(() => {
-            // Apply fallback temporary values instantly without waiting for metrics to compute
-            post.likes_count = '...';
-            post.reply_count = '...';
-            post.has_user_liked = false;
+    setTimeout(() => {
+        post.likes_count = '...';
+        post.reply_count = '...';
+        post.has_user_liked = false;
 
-            const modernNode = compilePostHtmlNode(post);
-            if (!modernNode) return;
-            
-            // Set up initial invisible transform properties natively
-            modernNode.style.opacity = '0';
-            modernNode.style.transform = 'translateY(8px)';
-            modernNode.style.transition = 'opacity 0.25s ease, transform 0.25s ease-out';
-            modernNode.style.willChange = 'opacity, transform'; // Tells mobile GPUs to wake up early
-            
-            feedContainer.appendChild(modernNode);
-            
-            // Force paint loop synchronization
-            requestAnimationFrame(() => {
-                modernNode.style.opacity = '1';
-                modernNode.style.transform = 'translateY(0)';
-            });
+        const modernNode = compilePostHtmlNode(post);
+        if (!modernNode) return;
+        
+        modernNode.style.opacity = '0';
+        modernNode.style.transform = 'translateY(8px)';
+        modernNode.style.transition = 'opacity 0.25s ease, transform 0.25s ease-out';
+        modernNode.style.willChange = 'opacity, transform'; 
+        
+        feedContainer.appendChild(modernNode);
+        
+        requestAnimationFrame(() => {
+            modernNode.style.opacity = '1';
+            modernNode.style.transform = 'translateY(0)';
+        });
 
-            // 4. ASYNCHRONOUS LAZY LOAD: Stream database stats individually without stalling UI frames
-            if (typeof lazyLoadPostMetrics === 'function') {
-                lazyLoadPostMetrics(post.id, modernNode);
-            }
+        if (typeof lazyLoadPostMetrics === 'function') {
+            lazyLoadPostMetrics(post.id, modernNode);
+        }
 
-        }, index * 30); // Accelerated trickle cascade down to a sleek 30ms interface draw rhythm
-    });
+    }, index * 30); 
+});
+
 }
 
 /**
@@ -265,7 +262,7 @@ function compilePostHtmlNode(post) {
         <div class="tweet-content">
             <div class="tweet-header">
                 <div class="header-meta-group">
-                    <span class="name">Anonymous</span>
+                    <span class="name">Anon</span>
                     <span class="handle">@anon</span>
                     <span class="time">· ${formattedTime}</span>
                     <span class="cat-badge">${getCategoryDisplayName(post.category)}</span>
@@ -404,21 +401,19 @@ async function togglePostLikeState(postId, buttonNode) {
 let globalActiveThreadAuthorSessionId = '';
 
 function openThreadModal(postId, postContent, postCategory, postCreatedAt) {
+    // Standardize your global ID reference state immediately
     globalActiveFocusedPostId = postId;
+    
     const modal = document.getElementById('thread-modal');
     const focusBox = document.getElementById('modal-focus-post');
     
     if (!modal || !focusBox) return;
     
-    // 1. Reveal the modal layout wrapper instantly
     modal.classList.remove('hidden');
 
     const formattedTime = typeof formatTimestampRelative === 'function' ? formatTimestampRelative(postCreatedAt) : 'Just now';
-
-    // 2. NATIVE SANITIZATION: Prevents XSS injections without crashing if escapeHtmlMarkup is missing
     const safeContent = typeof escapeHtmlMarkup === 'function' ? escapeHtmlMarkup(postContent) : postContent;
 
-    // 3. INSTANT UI PAINT: Render the focused parent post text right away
     focusBox.innerHTML = `
         <div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
             <div class="avatar" style="width:32px; height:32px; font-size:14px; display:flex; align-items:center; justify-content:center;">🥷</div>
@@ -428,25 +423,24 @@ function openThreadModal(postId, postContent, postCategory, postCreatedAt) {
             </div>
         </div>
         <div style="font-size:17px; line-height:1.4; color:white; margin-bottom:8px; white-space:pre-wrap; word-break:break-word;">${safeContent}</div>
-        <span class="cat-badge">${postCategory}</span>
+        <span class="cat-badge">${typeof getCategoryDisplayName === 'function' ? getCategoryDisplayName(postCategory) : postCategory}</span>
     `;
 
-    // 4. DEFERRED OP SECURITY FETCH: Quietly resolve owner verification in the background
-    supabaseClient
-        .from('posts')
-        .select('session_id')
-        .eq('id', postId)
-        .single()
-        .then(({ data, error }) => {
-            if (!error && data) {
-                globalActiveThreadAuthorSessionId = data.session_id;
-                // Re-trigger the comment loop so badges align correctly with the resolved session
+    // 🌟 OPTIMIZATION: Fetch OP session tracking metadata and thread replies at the exact same time
+    // This stops your interface from clearing out and re-rendering twice!
+    Promise.all([
+        supabaseClient.from('posts').select('session_id').eq('id', postId).single(),
+        typeof fetchAndRenderComments === 'function' ? fetchAndRenderComments(postId) : Promise.resolve()
+    ]).then(([postResult]) => {
+        if (postResult && !postResult.error && postResult.data) {
+            globalActiveThreadAuthorSessionId = postResult.data.session_id;
+            
+            // If the active user happens to be the OP, quietly re-render comments to attach OP badges cleanly
+            if (currentSessionId === globalActiveThreadAuthorSessionId) {
                 fetchAndRenderComments(postId);
             }
-        });
-
-    // 5. DEFERRED COMMENT FETCH: Fire off the replies data trickle loop asynchronously
-    fetchAndRenderComments(postId);
+        }
+    }).catch(err => console.error("Thread Sync Error:", err));
 }
 
 
@@ -454,7 +448,7 @@ async function fetchAndRenderComments(postId) {
     const commentsList = document.getElementById('modal-comments-list');
     if (!commentsList) return;
 
-    commentsList.innerHTML = `<div style="padding:16px;text-align:center;color:#71767b;"><i class="fa-solid fa-circle-notch fa-spin"></i></div>`;
+    commentsList.innerHTML = `<div style="padding:16px;text-align:center;color:#71767b;"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading replies...</div>`;
 
     const { data: replies, error } = await supabaseClient
         .from('replies')
@@ -463,31 +457,47 @@ async function fetchAndRenderComments(postId) {
         .order('created_at', { ascending: true });
 
     if (error) {
-        commentsList.innerHTML = `<div style="padding:16px;color:#f91880;">Handshake retrieval error.</div>`;
+        commentsList.innerHTML = `<div style="padding:16px;color:#f91880;">Failed to load replies.</div>`;
         return;
     }
 
     if (!replies || replies.length === 0) {
-        commentsList.innerHTML = `<div style="padding:30px;text-align:center;color:#71767b;font-size:13px;">No encrypted traffic on this wire yet.</div>`;
+        commentsList.innerHTML = `<div style="padding:30px;text-align:center;color:#71767b;font-size:13px;">No replies yet. Be the first to respond.</div>`;
         return;
     }
 
     commentsList.innerHTML = '';
     
-    // Fix 3: Clean, closed array loop encapsulation blocks
     replies.forEach(reply => {
         const replyNode = document.createElement('div');
-        replyNode.className = 'comment-card';
-        // Your code building out the inner contents goes here...
+        replyNode.className = 'reply-node';
+        replyNode.style.cssText = 'width:100%; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.04);';
+        
+        // Check if this reply is from the original poster
+        const isOriginalPoster = reply.session_id === globalActiveThreadAuthorSessionId;
+        const opTagHtml = isOriginalPoster ? '<span class="op-badge" style="background:#1d9bf0; color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:6px;">OP</span>' : '';
+        const displayTime = typeof formatTimestampRelative === 'function' ? formatTimestampRelative(reply.created_at) : 'Just now';
+        
+        // Build the reply HTML
+        replyNode.innerHTML = `
+            <div style="display:flex; align-items:center; margin-bottom:4px;">
+                <span style="font-weight:bold; font-size:13px; color:#f7f9fa;">Anonymous</span>
+                ${opTagHtml}
+                <span style="color:#71767b; font-size:12px; margin-left:6px;">· ${displayTime}</span>
+            </div>
+            <div style="font-size:14px; line-height:1.4; color:#e7e9ea; white-space:pre-wrap; word-break:break-word;">${escapeHtmlMarkup(reply.content)}</div>
+        `;
+        
         commentsList.appendChild(replyNode);
     });
 }
 
+// =========================================================================
+// 3. OPTIMISTIC REPLY INJECTION ENGINE
+// =========================================================================
 async function handleReplySubmit() {
     const textarea = document.getElementById('reply-textarea');
     const submitBtn = document.getElementById('submit-reply-btn');
-    
-    // 🌟 FIXED: Target 'modal-comments-list' to match your actual HTML template ID exactly
     const commentsContainer = document.getElementById('modal-comments-list');
 
     if (!textarea || !submitBtn || !commentsContainer) {
@@ -496,29 +506,26 @@ async function handleReplySubmit() {
     }
 
     const content = textarea.value.trim();
-    if (!content) return;
+    if (!content || !globalActiveFocusedPostId) return;
 
-    // 1. Lock input states to prevent double-submitting spam
+    // Lock controls to block multi-click race condition states
     textarea.disabled = true;
     submitBtn.disabled = true;
     submitBtn.textContent = 'Posting...';
 
-    // Capture values for instant rendering
     const tempReplyContent = content;
     const nowIsoString = new Date().toISOString();
 
-    // 2. IMMEDIATE INJECTION (Optimistic UI)
-    // Clear out placeholder messages if present
+    // Clear loading state placeholders gracefully
     if (commentsContainer.innerHTML.includes('No replies yet') || commentsContainer.innerHTML.includes('Reading responses')) {
         commentsContainer.innerHTML = '';
     }
 
-    // Create a temporary local node card
+    // Build the optimistic UI card component block
     const localNode = document.createElement('div');
     localNode.className = 'reply-node temporary-optimistic-node';
     localNode.style.cssText = 'width:100%; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.04); opacity: 0.6;'; 
 
-    // Is the replier the Original Poster?
     const isOriginalPoster = currentSessionId === globalActiveThreadAuthorSessionId;
     const opTagHtml = isOriginalPoster ? `<span style="background:#1d9bf0; color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:6px;">OP</span>` : '';
 
@@ -533,25 +540,22 @@ async function handleReplySubmit() {
     const textContainer = document.createElement('div');
     textContainer.style.cssText = 'font-size:14px; line-height:1.4; color:#e7e9ea; white-space:pre-wrap; word-break:break-word;';
     textContainer.textContent = tempReplyContent; 
-    
     localNode.appendChild(textContainer);
     
-    // Append your new node straight to the bottom of the list instantly!
     commentsContainer.appendChild(localNode);
 
-    // Auto-scroll the container to the bottom so you see your reply slip into place
     const modalScroll = document.querySelector('.modal-scroll');
     if (modalScroll) {
         modalScroll.scrollTop = modalScroll.scrollHeight;
     }
 
-    // 3. Clear the text input field immediately for clean user experience
+    // Reset input fields immediately for seamless look-and-feel transitions
     textarea.value = '';
     textarea.disabled = false;
     submitBtn.disabled = false;
     submitBtn.textContent = 'Reply';
 
-    // 4. QUIET BACKGROUND SYNC: Ship data to Supabase silently
+    // Ship tracking records to backend tables quietly
     const { error } = await supabaseClient
         .from('replies')
         .insert([
@@ -570,13 +574,14 @@ async function handleReplySubmit() {
         return;
     }
 
-    // 5. Finalize the node styling once confirmed by the database
+    // Solidify node presentation rules once verified by backend acknowledgments
     localNode.style.opacity = '1'; 
     localNode.classList.remove('temporary-optimistic-node');
 
-    // 6. Dynamically increment the comment counter on the main timeline post card
+    // Dynamically update your main feed metric displays inline
     const mainTimelinePostCard = document.getElementById(`ui-post-${globalActiveFocusedPostId}`);
     if (mainTimelinePostCard) {
+        // Find your comment badge span layout securely
         const commentCounterSpan = mainTimelinePostCard.querySelector('.action.comment span');
         if (commentCounterSpan) {
             const currentCount = parseInt(commentCounterSpan.textContent) || 0;
