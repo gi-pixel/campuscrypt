@@ -53,6 +53,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
+  background-color: #000000;
   width: 100%;
 }
 
@@ -61,16 +62,15 @@ body {
    ========================================== */
 .category-bar-wrapper {
   position: sticky;
-  top: 0;
-  z-index: 99;
-  background: #050505;
+  top: 49px; 
+  z-index: 99; 
 }
 
 .category-bar {
   display: flex;
   gap: 8px;
   padding: 12px;
-  background: #050505;
+  background: #000000; 
   overflow-x: auto;
   border-bottom: 1px solid #222;
 }
@@ -290,9 +290,11 @@ body {
 .tabs {
   display: flex;
   width: 100%;
-  margin-top: 14px;
-  border-top: 1px solid #16181c;
+  background-color: #000000;
   border-bottom: 1px solid #16181c;
+  position: sticky;
+  top: 0;
+  z-index: 100; /* Highest level keeps it floating cleanly above layout cards */
 }
 
 .tabs div,
@@ -302,7 +304,7 @@ body {
   border: none;
   color: #71767b;
   font-weight: bold;
-  padding: 14px 0;
+  padding: 14px 0; /* Creates an overall fixed component height of ~49px */
   font-size: 0.95rem;
   cursor: pointer;
   text-align: center;
@@ -348,9 +350,9 @@ body {
 }
 
 .cat-pill.active {
-  background: #fff;
-  color: #000;
-  border-color: #fff;
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
 }
 
 .tweet {
@@ -713,20 +715,16 @@ body {
   <div class="twitter">
 
 <div class="top-bar">
-  <div class="top-bar-branding">
-    <div class="logo-container">
-      <i class="fa-solid fa-user-secret brand-icon"></i>
-      <span class="brand-name">CampusCrypt</span>
-    </div>
-    
-    <div class="action-container">
-      <button id="installBtn" class="btn-pwa-install" aria-label="Install CampusCrypt application">
-        Install
-      </button>
-      
-      <span id="local-session-badge" class="session-badge syncing">Syncing...</span>
-    </div>
+<div class="top-bar-branding">
+  <div class="logo-container">
+    <i class="fa-solid fa-user-secret brand-icon"></i>
+    <span class="brand-name">CampusCrypt</span>
   </div>
+  <div class="action-container">
+    <button id="installBtn" class="btn-pwa-install">Install</button>
+    <span id="local-session-badge" class="session-badge syncing">Syncing...</span>
+  </div>
+</div>
 
   <nav class="tabs" aria-label="Feed navigation views">
     <button id="tab-latest" class="tab-item active" onclick="switchFeedTab('latest')" role="tab" aria-selected="true">Latest</button>
