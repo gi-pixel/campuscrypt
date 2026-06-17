@@ -621,25 +621,31 @@ function switchFeedTab(tabName) {
     // 1. Update the global state tracking index variable
     globalCurrentFeedTab = tabName;
     
-    // 2. NEW: Burn choice into persistent local device storage matrix 
+    // 2. Burn choice into persistent local device storage matrix 
     localStorage.setItem('cc_preferred_tab', tabName);
 
-    // 3. Toggle interactive UI class states to match current active selection layout
+    // 3. Toggle interactive UI class states securely using classList
     const latestTab = document.getElementById('tab-latest');
     const trendingTab = document.getElementById('tab-trending');
 
-    if (latestTab) latestTab.className = tabName === 'latest' ? 'active' : '';
-    if (trendingTab) trendingTab.className = tabName === 'trending' ? 'active' : '';
+    if (latestTab && trendingTab) {
+        if (tabName === 'latest') {
+            latestTab.classList.add('active');
+            trendingTab.classList.remove('active');
+        } else {
+            trendingTab.classList.add('active');
+            latestTab.classList.remove('active');
+        }
+    }
     
-    // 4. Trigger chronological timeline rendering loop (Sorting algorithms automatically execute inside)
+    // 4. Trigger chronological timeline rendering loop
     fetchAndRenderFeed();
 }
 
 function filterByCategory(categoryName, elementNode) {
-    // 🌟 FIXED: Added 'vibes_chills' to match your HTML dropdown select capabilities
     const validCategories = [
         'all', 'general', 'campus', 'programming', 
-        'anime', 'studies', 'confessions', 'vibes_chills'
+        'anime', 'studies', 'confessions'
     ];
     
     if (categoryName === 'all') {
@@ -754,17 +760,30 @@ function containsProhibitedContent(text) {
 
 function initRealtimeSubscriptions() {
     
-    // 1. Subscribe to NEW POSTS
+    // ==========================================
+    // 1. SUBSCRIBE TO NEW POSTS (+ PWA BADGING)
+    // ==========================================
     supabaseClient
         .channel('posts-channel')
         .on('postgres_changes', 
             { event: 'INSERT', schema: 'public', table: 'posts' }, 
             (payload) => {
-                console.log('New post broadcast:', payload.new);
+                console.log('📡 New post broadcast:', payload.new);
                 const newPost = payload.new;
                 
                 // Don't add if current user just posted
                 if (newPost.session_id === currentSessionId) return;
+                
+                // 🔔 PWA BADGE TRACKER: Process metrics if the application window is minimized/hidden
+                if (document.visibilityState === 'hidden') {
+                    let unreadCount = parseInt(localStorage.getItem('crypt_unread')) || 0;
+                    unreadCount++;
+                    
+                    localStorage.setItem('crypt_unread', unreadCount);
+                    if ('setAppBadge' in navigator) {
+                        navigator.setAppBadge(unreadCount).catch((err) => console.log("PWA Badge push error:", err));
+                    }
+                }
                 
                 // Check category filter
                 if (globalCurrentCategory !== 'all' && newPost.category !== globalCurrentCategory) return;
@@ -775,7 +794,7 @@ function initRealtimeSubscriptions() {
                 const container = document.getElementById('feed-container');
                 if (!container) return;
                 
-                // Remove empty state
+                // Remove empty state markup gracefully
                 if (container.children.length === 1 && container.querySelector('div[style*="text-align:center"]')) {
                     container.innerHTML = '';
                 }
@@ -795,13 +814,15 @@ function initRealtimeSubscriptions() {
             console.log('Posts channel status:', status);
         });
     
-    // 2. Subscribe to NEW REPLIES
+    // ==========================================
+    // 2. SUBSCRIBE TO NEW REPLIES
+    // ==========================================
     supabaseClient
         .channel('replies-channel')
         .on('postgres_changes', 
             { event: 'INSERT', schema: 'public', table: 'replies' }, 
             async (payload) => {
-                console.log('New reply broadcast:', payload.new);
+                console.log('📡 New reply broadcast:', payload.new);
                 const newReply = payload.new;
                 
                 // Skip if current user just replied
@@ -809,7 +830,7 @@ function initRealtimeSubscriptions() {
                 
                 // If thread modal is open for this post, add reply live
                 if (globalActiveFocusedPostId === newReply.post_id) {
-                    // Fetch OP session for badge
+                    // Fetch OP session for badge matching
                     const { data: postData } = await supabaseClient
                         .from('posts')
                         .select('session_id')
@@ -820,7 +841,7 @@ function initRealtimeSubscriptions() {
                     appendReplyToModal(newReply, isOP);
                 }
                 
-                // Update reply count on timeline card
+                // Update reply count on timeline card layout
                 const timelineCard = document.getElementById(`ui-post-${newReply.post_id}`);
                 if (timelineCard) {
                     const replySpan = timelineCard.querySelector('.action.comment span');
@@ -835,19 +856,22 @@ function initRealtimeSubscriptions() {
             console.log('Replies channel status:', status);
         });
     
-    // 3. Subscribe to POST UPDATES (likes, replies count)
+    // ==========================================
+    // 3. SUBSCRIBE TO POST UPDATES (Likes/Metrics)
+    // ==========================================
     supabaseClient
         .channel('posts-update-channel')
         .on('postgres_changes', 
             { event: 'UPDATE', schema: 'public', table: 'posts' }, 
             (payload) => {
-                console.log('Post update broadcast:', payload.new);
+                console.log('📡 Post update broadcast:', payload.new);
                 const updatedPost = payload.new;
                 
                 const postCard = document.getElementById(`ui-post-${updatedPost.id}`);
                 if (postCard) {
                     const likeSpan = postCard.querySelector('.like-counter-val');
                     if (likeSpan) likeSpan.textContent = updatedPost.likes_count || 0;
+                    
                     const replySpan = postCard.querySelector('.action.comment span');
                     if (replySpan) replySpan.textContent = updatedPost.reply_count || 0;
                 }
@@ -923,3 +947,73 @@ function initPresenceTracking() {
             }
         });
 }
+
+// ==========================================
+// PWA: SERVICE WORKER REGISTRATION
+// ==========================================
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+        try {
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            console.log(' Service Worker registered:', registration.scope);
+        } catch (error) {
+            console.error('Service Worker registration failed:', error);
+        }
+    });
+}
+
+// ==========================================
+// PWA: BADGE MANAGEMENT
+// ==========================================
+function clearPwaBadges() {
+    if ('clearAppBadge' in navigator) {
+        navigator.clearAppBadge().catch((err) => console.log("⚠️ PWA Badge clear failure:", err));
+    }
+    localStorage.setItem('crypt_unread', '0');
+}
+
+// Clear active badge and local disk count indicators when the window gains focus
+window.addEventListener('focus', clearPwaBadges);
+window.addEventListener('pageshow', clearPwaBadges); // Catches specific mobile OS wake vectors
+
+// ==========================================
+// PWA: DEVICE INSTALL PROMPT PIPELINE
+// ==========================================
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Intercept native browser installation manager prompts
+    e.preventDefault();
+    deferredPrompt = e;
+    
+    // Unhide your custom dashboard entry point installation trigger button
+    const installBtn = document.getElementById('installBtn');
+    if (installBtn) installBtn.style.display = 'block';
+});
+
+document.getElementById('installBtn')?.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    
+    deferredPrompt.prompt();
+    
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User installation prompt resolution state: ${outcome}`);
+    
+    // Strip layout visibility constraints if approved or dismissed
+    const installBtn = document.getElementById('installBtn');
+    if (installBtn) installBtn.style.display = 'none';
+    
+    deferredPrompt = null;
+});
+
+// ==========================================
+// PWA: RUNTIME PERMISSIONS BOOTSTRAPPER
+// ==========================================
+// Solicits system notification channel authorizations on the user's first page interaction click
+document.addEventListener('click', () => {
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().then((permission) => {
+            console.log(` System notice authorization status: ${permission}`);
+        });
+    }
+}, { once: true });

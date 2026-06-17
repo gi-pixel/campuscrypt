@@ -1,0 +1,22 @@
+{
+  "short_name": "CampusCrypt",
+  "name": "CampusCrypt Anonymous Network",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#000000",
+  "theme_color": "#1d9bf0",
+  "display": "standalone",
+  "orientation": "portrait",
+  "description": "Anonymous campus conversations. No accounts. No trace."
+}
