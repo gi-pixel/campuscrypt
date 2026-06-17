@@ -6,7 +6,7 @@ const SUPABASE_URL = 'https://xtqfbaqckgodxmsnyexh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0cWZiYXFja2dvZHhtc255ZXhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTgwODIsImV4cCI6MjA5Njg3NDA4Mn0.cWsx_9gyk3m9Dz6ZMn_8qHQ0s_20qiNvJTUn8Q0p3uM';
 const BANNED_KEYWORDS = [
     "kill", "porno", "porn", "fuck", "fvck", "bitch", "asshole", 
-    "cunt", "dick", "suicide", "vagina", "penis", "breast", "boobs", "boob", "stupid"
+    "cunt", "dick", "suicide", "vagina", "penis", "breast", "boobs", "boob", "stupid", "pussy", "rape", "slut", "ass" 
 ];
 
 let currentSessionId = localStorage.getItem('cc_session_id');
@@ -97,8 +97,7 @@ window.addEventListener('DOMContentLoaded', () => {
             mainAppLayout.style.opacity = '1';     
         }
         fetchAndRenderFeed();
-        
-        //  ADD REAL-TIME SUBSCRIPTIONS HERE (after feed loads)
+        initPresenceTracking();
         initRealtimeSubscriptions();
         
     } else {
@@ -761,7 +760,7 @@ function initRealtimeSubscriptions() {
         .on('postgres_changes', 
             { event: 'INSERT', schema: 'public', table: 'posts' }, 
             (payload) => {
-                console.log('📡 New post broadcast:', payload.new);
+                console.log('New post broadcast:', payload.new);
                 const newPost = payload.new;
                 
                 // Don't add if current user just posted
@@ -802,7 +801,7 @@ function initRealtimeSubscriptions() {
         .on('postgres_changes', 
             { event: 'INSERT', schema: 'public', table: 'replies' }, 
             async (payload) => {
-                console.log('📡 New reply broadcast:', payload.new);
+                console.log('New reply broadcast:', payload.new);
                 const newReply = payload.new;
                 
                 // Skip if current user just replied
@@ -842,7 +841,7 @@ function initRealtimeSubscriptions() {
         .on('postgres_changes', 
             { event: 'UPDATE', schema: 'public', table: 'posts' }, 
             (payload) => {
-                console.log('📡 Post update broadcast:', payload.new);
+                console.log('Post update broadcast:', payload.new);
                 const updatedPost = payload.new;
                 
                 const postCard = document.getElementById(`ui-post-${updatedPost.id}`);
@@ -891,4 +890,36 @@ function appendReplyToModal(reply, isOP) {
     if (modalScroll) {
         modalScroll.scrollTop = modalScroll.scrollHeight;
     }
+}
+
+// ==========================================
+// PRESENCE TRACKING (Online Users)
+// ==========================================
+function initPresenceTracking() {
+    const presenceChannel = supabaseClient.channel('campus_crypt_analytics');
+    
+    presenceChannel
+        .on('presence', { event: 'sync' }, () => {
+            const newState = presenceChannel.presenceState();
+            const totalOnlineNow = Object.keys(newState).length;
+            
+            // Store in localStorage for admin panel
+            localStorage.setItem('crypt_online_count', totalOnlineNow);
+            localStorage.setItem('crypt_online_last_update', Date.now());
+            
+            console.log(`👥 Active online: ${totalOnlineNow}`);
+            
+            // Dispatch event for admin panel
+            window.dispatchEvent(new CustomEvent('presenceUpdate', { 
+                detail: { online: totalOnlineNow } 
+            }));
+        })
+        .subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+                await presenceChannel.track({
+                    online_at: new Date().toISOString(),
+                    user_session: currentSessionId
+                });
+            }
+        });
 }
