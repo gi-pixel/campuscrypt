@@ -8,6 +8,8 @@ const BANNED_KEYWORDS = [
     "kill", "porno", "porn", "fuck", "fvck", "bitch", "asshole", 
     "cunt", "dick", "suicide", "vagina", "penis", "breast", "boobs", "boob", "stupid", "pussy", "rape", "slut", "ass" 
 ];
+const GIPHY_API_KEY = '1phayPh21mSPyikZDaw0xw0s6ikBIcxW'; 
+let globalSelectedStickerUrl = null;
 
 let currentSessionId = localStorage.getItem('cc_session_id');
 if (!currentSessionId) {
@@ -260,6 +262,17 @@ function compilePostHtmlNode(post) {
         openThreadModal(post.id, post.content, post.category, post.created_at);
     });
 
+    // ====== INTEGRATION: Sticker render ======
+    let stickerHtml = '';
+    if (post.image_url) {
+        stickerHtml = `
+            <div class="post-sticker-render" style="margin-top: 10px; display: flex; justify-content: flex-start;">
+                <img src="${post.image_url}" loading="lazy" style="max-height: 140px; width: auto; object-fit: contain; border-radius: 8px;">
+            </div>
+        `;
+    }
+    // ========================================
+
     postCard.innerHTML = `
         <div class="avatar">🥷</div>
         <div class="tweet-content">
@@ -273,6 +286,7 @@ function compilePostHtmlNode(post) {
                 ${canDelete ? `<button class="delete-btn" onclick="event.stopPropagation(); executePostDeletion('${post.id}')"><i class="fa-regular fa-trash-can"></i></button>` : ''}
             </div>
             <div class="tweet-text">${safeContent}</div>
+            ${stickerHtml}
             <div class="actions">
                 <div class="action comment">
                     <i class="fa-regular fa-comment"></i>
@@ -317,9 +331,17 @@ async function handlePostSubmit() {
     submitBtn.textContent = 'Posting...';
 
     // 5. Asynchronously stream data payload to Supabase database
+    // INTEGRATION: Include the selected sticker URL if any
+    const payload = {
+        content,
+        category,
+        session_id: currentSessionId,
+        image_url: globalSelectedStickerUrl || null
+    };
+
     const { data: newRowData, error } = await supabaseClient
         .from('posts')
-        .insert([{ content, category, session_id: currentSessionId }])
+        .insert([payload])
         .select()
         .single();
 
@@ -338,6 +360,15 @@ async function handlePostSubmit() {
     const charCounter = document.getElementById('char-counter');
     if (charCounter) charCounter.textContent = '0 / 280';
     
+    // INTEGRATION: Reset sticker selection
+    globalSelectedStickerUrl = null;
+    const previewContainer = document.getElementById('selectedStickerPreview');
+    if (previewContainer) {
+        previewContainer.style.display = 'none';
+        const previewImg = document.getElementById('previewStickerImg');
+        if (previewImg) previewImg.src = '';
+    }
+    
     closeComposerModal(); // Closes out the view overlay drawer layout
     
     // 9. DYNAMIC LOCAL INJECTION: Instantly push row to feed without reloading
@@ -352,6 +383,8 @@ async function handlePostSubmit() {
         newRowData.likes_count = 0;
         newRowData.reply_count = 0;
         newRowData.has_user_liked = false;
+        // INTEGRATION: Ensure the image_url is carried into the client-side post object
+        newRowData.image_url = payload.image_url;
 
         // Compile and insert node card at the very absolute top position
         const modernNode = compilePostHtmlNode(newRowData);
@@ -640,6 +673,80 @@ function switchFeedTab(tabName) {
     
     // 4. Trigger chronological timeline rendering loop
     fetchAndRenderFeed();
+}
+
+
+// ==========================================
+// STICKER FEATURE FUNCTIONS
+// ==========================================
+
+// Toggle Sticker Drawer
+function toggleStickerDrawer() {
+    const drawer = document.getElementById('stickerDrawer');
+    if (!drawer) return;
+    
+    if (drawer.style.display === 'none' || drawer.style.display === '') {
+        drawer.style.display = 'block';
+        // Load trending stickers if tray is empty
+        const tray = document.getElementById('stickerResultsTray');
+        if (tray && tray.children.length === 0) {
+            fetchGiphyStickers();
+        }
+    } else {
+        drawer.style.display = 'none';
+    }
+}
+
+// Fetch Stickers from GIPHY
+async function fetchGiphyStickers(searchQuery = '') {
+    const tray = document.getElementById('stickerResultsTray');
+    if (!tray) return;
+    
+    tray.innerHTML = `<div style="color: #71767b; font-size: 12px; padding: 20px; text-align: center;">Loading stickers...</div>`;
+    
+    const url = searchQuery.trim() === ''
+        ? `https://api.giphy.com/v1/stickers/trending?api_key=${GIPHY_API_KEY}&limit=20&rating=g`
+        : `https://api.giphy.com/v1/stickers/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(searchQuery)}&limit=20&rating=g`;
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (!data.data || data.data.length === 0) {
+            tray.innerHTML = `<div style="color: #71767b; font-size: 12px; padding: 20px; text-align: center;">No stickers found.</div>`;
+            return;
+        }
+        
+        tray.innerHTML = data.data.map(sticker => {
+            const staticUrl = sticker.images.fixed_height_small.url;
+            const fullUrl = sticker.images.fixed_height.url;
+            return `
+                <img src="${staticUrl}" 
+                     class="sticker-grid-item"
+                     onclick="selectSticker('${fullUrl}')"
+                     alt="sticker">
+            `;
+        }).join('');
+        
+    } catch (err) {
+        console.error("Giphy Error:", err);
+        tray.innerHTML = `<div style="color: #f91880; font-size: 12px; padding: 20px; text-align: center;">Failed to load stickers.</div>`;
+    }
+}
+
+// Select a sticker
+function selectSticker(url) {
+    globalSelectedStickerUrl = url;
+    document.getElementById('previewStickerImg').src = url;
+    document.getElementById('selectedStickerPreview').style.display = 'flex';
+    document.getElementById('stickerDrawer').style.display = 'none';
+}
+
+// Remove selected sticker
+function removeSticker() {
+    globalSelectedStickerUrl = null;
+    document.getElementById('selectedStickerPreview').style.display = 'none';
+    document.getElementById('previewStickerImg').src = '';
 }
 
 function filterByCategory(categoryName, elementNode) {
@@ -1017,3 +1124,36 @@ document.addEventListener('click', () => {
         });
     }
 }, { once: true });
+
+// ==========================================
+// STICKER EVENT BINDINGS
+// ==========================================
+
+// Toggle drawer on button click
+document.getElementById('stickerToggleBtn')?.addEventListener('click', toggleStickerDrawer);
+
+// Sticker search with debounce
+const stickerSearchInput = document.getElementById('stickerSearchInput');
+if (stickerSearchInput) {
+    let searchTimer;
+    stickerSearchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            fetchGiphyStickers(e.target.value);
+        }, 400);
+    });
+}
+
+// Remove sticker button
+document.getElementById('removeStickerBtn')?.addEventListener('click', removeSticker);
+
+// Close drawer when clicking outside
+document.addEventListener('click', (e) => {
+    const drawer = document.getElementById('stickerDrawer');
+    const toggleBtn = document.getElementById('stickerToggleBtn');
+    if (drawer && drawer.style.display !== 'none') {
+        if (!drawer.contains(e.target) && !toggleBtn?.contains(e.target)) {
+            drawer.style.display = 'none';
+        }
+    }
+});

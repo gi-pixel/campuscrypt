@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>CampusCrypt — Anonymous Feed</title>
+  <title>CampusCrypt</title>
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -465,6 +465,68 @@ body {
 }
 .modal-overlay.hidden { display: none !important; }
 
+/* ==========================================
+   STICKER FEATURE STYLES
+   ========================================== */
+.sticker-preview {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: #16181c;
+    border-radius: 8px;
+    border: 1px solid #2f3336;
+}
+
+.sticker-preview img {
+    height: 40px;
+    border-radius: 4px;
+}
+
+.sticker-remove-btn {
+    background: #f91880;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sticker-remove-btn:hover {
+    background: #d1086e;
+}
+
+.sticker-grid-item {
+    height: 80px;
+    width: auto;
+    cursor: pointer;
+    object-fit: contain;
+    transition: transform 0.15s ease;
+    border-radius: 4px;
+}
+
+.sticker-grid-item:hover {
+    transform: scale(1.08);
+}
+
+.post-sticker-render {
+    margin-top: 10px;
+    display: flex;
+    justify-content: flex-start;
+}
+
+.post-sticker-render img {
+    max-height: 140px;
+    width: auto;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
 .modal-box {
   background: #000;
   width: 100%;
@@ -760,54 +822,90 @@ body {
     <i class="fa-solid fa-magnifying-glass" onclick="document.getElementById('feed-search-input').focus()"></i>
   </div>
 
-  <div id="composer-modal" class="modal-overlay hidden" onclick="closeComposerModal()">
+<div id="composer-modal" class="modal-overlay hidden" onclick="closeComposerModal()">
     <div class="modal-box" onclick="event.stopPropagation()">
-      <div class="modal-header">
-        <span style="font-weight: bold;">Draft Anonymous Post</span>
-        <button class="modal-close" onclick="closeComposerModal()">✕</button>
-      </div>
-      <div class="modal-scroll">
-        <div class="composer-modal-content">
-          <div class="avatar">🥷</div>
-          <textarea id="post-textarea" maxlength="280" rows="4" placeholder="What's happening on campus?"></textarea>
+        <div class="modal-header">
+            <span style="font-weight: bold;">Draft Anonymous Post</span>
+            <button class="modal-close" onclick="closeComposerModal()">✕</button>
         </div>
-      </div>
-      <div class="composer-modal-meta">
-        <div>
-          <select id="category-select">
-            <option value="general">General</option>
-            <option value="campus">Campus</option>
-            <option value="programming">Programming</option>
-            <option value="anime">Anime</option>
-            <option value="studies">Studies</option>
-            <option value="vibes_chills">Vibes & Chills</option>
-            <option value="confessions">Confessions</option>
-          </select>
-        </div>
-        <div>
-          <span id="char-counter" class="char-counter">0 / 280</span>
-          <button id="submit-post-btn" class="post-btn" onclick="handlePostSubmit()">Post Anon</button>
-        </div>
-      </div>
-    </div>
-  </div>
+        <div class="modal-scroll">
+            <div class="composer-modal-content">
+                <div class="avatar">🥷</div>
+                <textarea id="post-textarea" maxlength="280" rows="4" placeholder="What's happening on campus?"></textarea>
+            </div>
+            
+            <!-- ====== STICKER DRAWER (ADD THIS) ====== -->
+            <div class="compose-footer" style="display: flex; flex-direction: column; gap: 8px; padding: 10px 0; margin-top: 8px; border-top: 1px solid #222;">
+                
+                <div class="compose-actions" style="display: flex; align-items: center; gap: 12px;">
+                    <!-- Sticker Toggle Button -->
+                    <button type="button" id="stickerToggleBtn" style="background: none; border: none; cursor: pointer; padding: 4px;">
+                        <i class="fa-regular fa-face-smile" style="color: #1d9bf0; font-size: 20px;"></i>
+                    </button>
+                    
+                    <!-- Selected Sticker Preview -->
+                    <div id="selectedStickerPreview" style="display: none; position: relative; align-items: center;">
+                        <img id="previewStickerImg" src="" style="height: 50px; border-radius: 4px;">
+                        <button type="button" id="removeStickerBtn" style="position: absolute; top: -6px; right: -6px; background: #f91880; color: white; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center;">&times;</button>
+                    </div>
+                </div>
 
-  <div id="thread-modal" class="modal-overlay hidden" onclick="closeThreadModal()">
-    <div class="modal-box" onclick="event.stopPropagation()">
-      <div class="modal-header">
-        <span style="font-weight: bold;">Thread Discussion</span>
-        <button class="modal-close" onclick="closeThreadModal()">✕</button>
-      </div>
-      <div class="modal-scroll">
-        <div id="modal-focus-post"></div>
-        <div style="font-size: 13px; font-weight: bold; color: #71767b; margin-bottom: 10px; text-transform: uppercase;">Replies</div>
-        <div id="modal-comments-list"></div>
-      </div>
-      <div class="modal-footer-input">
+                <!-- Sticker Drawer (hidden by default) -->
+                <div id="stickerDrawer" style="display: none; background: #16181c; border: 1px solid #2f3336; border-radius: 12px; padding: 10px;">
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                        <input type="text" id="stickerSearchInput" placeholder="Search stickers..." style="flex: 1; background: #000; border: 1px solid #2f3336; color: white; border-radius: 20px; padding: 6px 12px; font-size: 13px; outline: none;">
+                    </div>
+                    
+                    <div id="stickerResultsTray" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; min-height: 90px;">
+                        <!-- Stickers load here -->
+                    </div>
+                </div>
+                
+            </div>
+            <!-- ====== END STICKER DRAWER ====== -->
+            
+        </div>
+        <div class="composer-modal-meta">
+            <div>
+                <select id="category-select">
+                    <option value="general">General</option>
+                    <option value="campus">Campus</option>
+                    <option value="programming">Programming</option>
+                    <option value="anime">Anime</option>
+                    <option value="studies">Studies</option>
+                    <option value="vibes_chills">Vibes & Chills</option>
+                    <option value="confessions">Confessions</option>
+                </select>
+            </div>
+            <div>
+                <span id="char-counter" class="char-counter">0 / 280</span>
+                <button id="submit-post-btn" class="post-btn" onclick="handlePostSubmit()">Post Anon</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="thread-modal" class="modal-overlay hidden" onclick="closeThreadModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title">Thread Discussion</span>
+      <button class="modal-close" onclick="closeThreadModal()">✕</button>
+    </div>
+    
+    <div class="modal-scroll">
+      <div id="modal-focus-post"></div>
+      <div class="section-label-replies">Replies</div>
+      <div id="modal-comments-list"></div>
+    </div>
+    
+    <div class="modal-footer-input">
+      <div class="reply-input-row">
         <textarea id="reply-textarea" maxlength="280" rows="2" placeholder="Post your anonymous reply..."></textarea>
         <button id="submit-reply-btn" class="post-btn" onclick="handleReplySubmit()">Reply</button>
       </div>
     </div>
+  </div>
+</div>
   </div>
 
   <script src="app.js"></script>
