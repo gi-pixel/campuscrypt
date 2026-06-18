@@ -646,26 +646,277 @@ body {
   padding: 12px 0;
   border-bottom: 1px solid #111;
 }
+/* Reply sticker preview */
+#replyStickerPreview {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0;
+    padding: 4px 8px;
+    background: #16181c;
+    border-radius: 8px;
+    border: 1px solid #2f3336;
+}
+#replyStickerPreview img {
+    height: 40px;
+    border-radius: 4px;
+}
+#removeReplyStickerBtn {
+    background: #f91880;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    font-size: 10px;
+}
+
+/* Reply sticker drawer */
+#replyStickerDrawer {
+    background: #16181c;
+    border: 1px solid #2f3336;
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 8px;
+}
+#replyStickerSearchInput {
+    width: 100%;
+    background: #000;
+    border: 1px solid #2f3336;
+    color: white;
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 13px;
+    outline: none;
+}
+#replyStickerResultsTray {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    min-height: 80px;
+}
+#replyStickerResultsTray img {
+    height: 70px;
+    width: auto;
+    cursor: pointer;
+    object-fit: contain;
+    transition: transform 0.1s;
+}
+#replyStickerResultsTray img:hover {
+    transform: scale(1.08);
+}
+
+/* Reply sticker render in comment */
+.comment-sticker-render {
+    margin-top: 8px;
+    display: flex;
+}
+.comment-sticker-render img {
+    max-height: 100px;
+    width: auto;
+    object-fit: contain;
+    border-radius: 6px;
+}
 
 .modal-footer-input {
-  padding: 14px;
+  padding: 12px 14px 14px 14px;
   border-top: 1px solid #222;
   background: #050505;
   display: flex;
-  gap: 10px;
-  align-items: flex-end;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.modal-footer-input textarea {
-  flex: 1;
+.reply-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.reply-input-row textarea {
+  width: 100%;
   background: #16181c;
   border: 1px solid #222;
   border-radius: 12px;
-  padding: 10px;
+  padding: 10px 12px;
   color: white;
   resize: none;
   outline: none;
   font-size: 14px;
+  font-family: inherit;
+  min-height: 52px;
+  transition: border-color 0.2s ease;
+}
+
+.reply-input-row textarea:focus {
+  border-color: #1d9bf0;
+}
+
+.reply-actions-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0 4px;
+}
+
+.reply-actions-row .btn-sticker-launcher {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  transition: transform 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.reply-actions-row .btn-sticker-launcher:hover {
+  transform: scale(1.1);
+}
+
+.reply-actions-row .btn-sticker-launcher i {
+  color: #1d9bf0;
+  font-size: 20px;
+}
+
+.reply-actions-row .post-btn {
+  background: #1d9bf0;
+  color: white;
+  border: none;
+  padding: 6px 18px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.reply-actions-row .post-btn:hover {
+  background: #1a8cd8;
+}
+
+.reply-actions-row .post-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Reply sticker preview */
+.sticker-preview-wrapper {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  margin: 4px 0 2px 0;
+  background: #16181c;
+  border-radius: 8px;
+  border: 1px solid #2f3336;
+}
+
+.sticker-preview-wrapper .sticker-preview-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sticker-preview-wrapper .sticker-preview-container img {
+  height: 44px;
+  width: auto;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.sticker-preview-wrapper .btn-remove-sticker {
+  background: #f91880;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.sticker-preview-wrapper .btn-remove-sticker:hover {
+  background: #d1086e;
+}
+
+/* Reply sticker drawer */
+.sticker-drawer-pane {
+  display: none;
+  background: #16181c;
+  border: 1px solid #2f3336;
+  border-radius: 12px;
+  padding: 10px;
+  margin: 4px 0 2px 0;
+}
+
+.sticker-drawer-pane .sticker-search-row {
+  margin-bottom: 8px;
+}
+
+.sticker-drawer-pane .sticker-search-row input {
+  width: 100%;
+  background: #000;
+  border: 1px solid #2f3336;
+  color: white;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+}
+
+.sticker-drawer-pane .sticker-search-row input:focus {
+  border-color: #1d9bf0;
+}
+
+.sticker-drawer-pane .sticker-search-row input::placeholder {
+  color: #71767b;
+}
+
+.sticker-results-scroll-tray {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 6px 2px;
+  min-height: 80px;
+  scrollbar-width: thin;
+}
+
+.sticker-results-scroll-tray::-webkit-scrollbar {
+  height: 4px;
+}
+
+.sticker-results-scroll-tray::-webkit-scrollbar-track {
+  background: #16181c;
+  border-radius: 4px;
+}
+
+.sticker-results-scroll-tray::-webkit-scrollbar-thumb {
+  background: #2f3336;
+  border-radius: 4px;
+}
+
+.sticker-results-scroll-tray img {
+  height: 70px;
+  width: auto;
+  cursor: pointer;
+  object-fit: contain;
+  border-radius: 6px;
+  transition: transform 0.15s ease;
+}
+
+.sticker-results-scroll-tray img:hover {
+  transform: scale(1.08);
 }
 
 .float-btn {
@@ -895,14 +1146,38 @@ body {
     
     <div class="modal-scroll">
       <div id="modal-focus-post"></div>
+      
+      <div id="replyStickerPreview" class="sticker-preview-wrapper" style="display: none;">
+        <div class="sticker-preview-container">
+          <img id="previewReplyStickerImg" src="" alt="Selected reply sticker">
+          <button type="button" id="removeReplyStickerBtn" class="btn-remove-sticker">&times;</button>
+        </div>
+      </div>
+      
       <div class="section-label-replies">Replies</div>
       <div id="modal-comments-list"></div>
+      
+      <div id="replyStickerDrawer" class="sticker-drawer-pane" style="display: none;">
+        <div class="sticker-search-row">
+          <input type="text" id="replyStickerSearchInput" placeholder="Search reply stickers...">
+        </div>
+        <div id="replyStickerResultsTray" class="sticker-results-scroll-tray">
+        </div>
+      </div>
     </div>
     
     <div class="modal-footer-input">
       <div class="reply-input-row">
         <textarea id="reply-textarea" maxlength="280" rows="2" placeholder="Post your anonymous reply..."></textarea>
-        <button id="submit-reply-btn" class="post-btn" onclick="handleReplySubmit()">Reply</button>
+        
+        <div class="reply-actions-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 6px;">
+          <!-- ====== REPLY STICKER TOGGLE BUTTON (Added) ====== -->
+          <button type="button" id="replyStickerToggleBtn" class="btn-sticker-launcher" aria-label="Open reply sticker tray">
+            <i class="fa-regular fa-face-smile" style="color: #1d9bf0; font-size: 20px;"></i>
+          </button>
+          
+          <button id="submit-reply-btn" class="post-btn" onclick="handleReplySubmit()">Reply</button>
+        </div>
       </div>
     </div>
   </div>

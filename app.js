@@ -514,6 +514,17 @@ async function fetchAndRenderComments(postId) {
         const opTagHtml = isOriginalPoster ? '<span class="op-badge" style="background:#1d9bf0; color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:6px;">OP</span>' : '';
         const displayTime = typeof formatTimestampRelative === 'function' ? formatTimestampRelative(reply.created_at) : 'Just now';
         
+        // ====== INTEGRATION: Render reply sticker if present ======
+        let replyStickerHtml = '';
+        if (reply.image_url) {
+            replyStickerHtml = `
+                <div class="comment-sticker-render" style="margin-top: 8px; display: flex;">
+                    <img src="${reply.image_url}" loading="lazy" style="max-height: 100px; width: auto; object-fit: contain; border-radius: 6px;">
+                </div>
+            `;
+        }
+        // ===========================================================
+        
         // Build the reply HTML
         replyNode.innerHTML = `
             <div style="display:flex; align-items:center; margin-bottom:4px;">
@@ -522,6 +533,7 @@ async function fetchAndRenderComments(postId) {
                 <span style="color:#71767b; font-size:12px; margin-left:6px;">· ${displayTime}</span>
             </div>
             <div style="font-size:14px; line-height:1.4; color:#e7e9ea; white-space:pre-wrap; word-break:break-word;">${escapeHtmlMarkup(reply.content)}</div>
+            ${replyStickerHtml}
         `;
         
         commentsList.appendChild(replyNode);
@@ -591,17 +603,20 @@ async function handleReplySubmit() {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Reply';
 
+    // ====== INTEGRATION: Build payload with reply sticker ======
+    const replyPayload = {
+        post_id: globalActiveFocusedPostId,
+        content: tempReplyContent,
+        session_id: currentSessionId,
+        created_at: nowIsoString,
+        image_url: globalSelectedReplyStickerUrl || null  // ← ADD THIS LINE
+    };
+    // =========================================================
+
     // Ship tracking records to backend tables quietly
     const { error } = await supabaseClient
         .from('replies')
-        .insert([
-            {
-                post_id: globalActiveFocusedPostId,
-                content: tempReplyContent,
-                session_id: currentSessionId,
-                created_at: nowIsoString
-            }
-        ]);
+        .insert([replyPayload]);
 
     if (error) {
         console.error('Failed to sync reply to cloud database:', error.message);
@@ -613,6 +628,20 @@ async function handleReplySubmit() {
     // Solidify node presentation rules once verified by backend acknowledgments
     localNode.style.opacity = '1'; 
     localNode.classList.remove('temporary-optimistic-node');
+
+    // ====== INTEGRATION: Reset reply sticker state after successful submission ======
+    globalSelectedReplyStickerUrl = null;
+    const previewContainer = document.getElementById('replyStickerPreview');
+    if (previewContainer) {
+        previewContainer.style.display = 'none';
+        const previewImg = document.getElementById('previewReplyStickerImg');
+        if (previewImg) previewImg.src = '';
+    }
+    const searchInput = document.getElementById('replyStickerSearchInput');
+    if (searchInput) searchInput.value = '';
+    const drawer = document.getElementById('replyStickerDrawer');
+    if (drawer) drawer.style.display = 'none';
+    // ============================================================================
 
     // Dynamically update your main feed metric displays inline
     const mainTimelinePostCard = document.getElementById(`ui-post-${globalActiveFocusedPostId}`);
@@ -644,6 +673,15 @@ function closeThreadModal() {
     const modal = document.getElementById('thread-modal');
     if (modal) modal.classList.add('hidden');
     globalActiveFocusedPostId = null;
+    
+    // Reset reply sticker state when modal closes
+    globalSelectedReplyStickerUrl = null;
+    const preview = document.getElementById('replyStickerPreview');
+    if (preview) preview.style.display = 'none';
+    const previewImg = document.getElementById('previewReplyStickerImg');
+    if (previewImg) previewImg.src = '';
+    const drawer = document.getElementById('replyStickerDrawer');
+    if (drawer) drawer.style.display = 'none';
 }
 
 // ==========================================
@@ -861,6 +899,94 @@ function containsProhibitedContent(text) {
     return BANNED_KEYWORDS.some(word => lowerText.includes(word.toLowerCase()));
 }
 
+
+// ==========================================
+// FETCH REPLY STICKERS FROM GIPHY
+// ==========================================
+async function fetchReplyGiphyStickers(searchQuery = '') {
+    const tray = document.getElementById('replyStickerResultsTray');
+    if (!tray) {
+        console.error('replyStickerResultsTray element not found');
+        return;
+    }
+    
+    tray.innerHTML = `<div style="color: #71767b; font-size: 12px; padding: 20px; text-align: center;">Loading stickers...</div>`;
+    
+    const url = searchQuery.trim() === ''
+        ? `https://api.giphy.com/v1/stickers/trending?api_key=${GIPHY_API_KEY}&limit=20&rating=g`
+        : `https://api.giphy.com/v1/stickers/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(searchQuery)}&limit=20&rating=g`;
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (!data.data || data.data.length === 0) {
+            tray.innerHTML = `<div style="color: #71767b; font-size: 12px; padding: 20px; text-align: center;">No stickers found.</div>`;
+            return;
+        }
+        
+        tray.innerHTML = data.data.map(sticker => {
+            const staticUrl = sticker.images.fixed_height_small.url;
+            const fullUrl = sticker.images.fixed_height.url;
+            return `
+                <img src="${staticUrl}" 
+                     style="height: 70px; width: auto; cursor: pointer; object-fit: contain; transition: transform 0.15s ease; border-radius: 6px;" 
+                     onclick="selectReplySticker('${fullUrl}')"
+                     onmouseover="this.style.transform='scale(1.08)'" 
+                     onmouseout="this.style.transform='scale(1)'">
+            `;
+        }).join('');
+        
+    } catch (err) {
+        console.error("Giphy Reply Sync Error:", err);
+        tray.innerHTML = `<div style="color: #f91880; font-size: 12px; padding: 20px; text-align: center;">Failed to load stickers.</div>`;
+    }
+}
+
+// ==========================================
+// SELECT REPLY STICKER
+// ==========================================
+function selectReplySticker(url) {
+    globalSelectedReplyStickerUrl = url;
+    
+    const previewImg = document.getElementById('previewReplyStickerImg');
+    const previewContainer = document.getElementById('replyStickerPreview');
+    
+    if (previewImg) previewImg.src = url;
+    if (previewContainer) previewContainer.style.display = 'flex';
+    
+    const drawer = document.getElementById('replyStickerDrawer');
+    if (drawer) drawer.style.display = 'none';
+}
+
+// ==========================================
+// REMOVE REPLY STICKER
+// ==========================================
+function removeReplySticker() {
+    globalSelectedReplyStickerUrl = null;
+    
+    const previewContainer = document.getElementById('replyStickerPreview');
+    const previewImg = document.getElementById('previewReplyStickerImg');
+    
+    if (previewContainer) previewContainer.style.display = 'none';
+    if (previewImg) previewImg.src = '';
+}
+
+// ==========================================
+// REPLY STICKER SEARCH (Debounced)
+// ==========================================
+document.getElementById('replyStickerSearchInput')?.addEventListener('input', (e) => {
+    clearTimeout(window.replyStickerSearchTimer);
+    window.replyStickerSearchTimer = setTimeout(() => {
+        fetchReplyGiphyStickers(e.target.value);
+    }, 400);
+});
+
+// ==========================================
+// REPLY STICKER REMOVE BUTTON
+// ==========================================
+document.getElementById('removeReplyStickerBtn')?.addEventListener('click', removeReplySticker);
+
 // ==========================================
 // REAL-TIME WEBSOCKET SUBSCRIPTIONS
 // ==========================================
@@ -962,32 +1088,24 @@ function initRealtimeSubscriptions() {
         .subscribe((status) => {
             console.log('Replies channel status:', status);
         });
-    
-    // ==========================================
-    // 3. SUBSCRIBE TO POST UPDATES (Likes/Metrics)
-    // ==========================================
-    supabaseClient
-        .channel('posts-update-channel')
-        .on('postgres_changes', 
-            { event: 'UPDATE', schema: 'public', table: 'posts' }, 
-            (payload) => {
-                console.log('📡 Post update broadcast:', payload.new);
-                const updatedPost = payload.new;
-                
-                const postCard = document.getElementById(`ui-post-${updatedPost.id}`);
-                if (postCard) {
-                    const likeSpan = postCard.querySelector('.like-counter-val');
-                    if (likeSpan) likeSpan.textContent = updatedPost.likes_count || 0;
-                    
-                    const replySpan = postCard.querySelector('.action.comment span');
-                    if (replySpan) replySpan.textContent = updatedPost.reply_count || 0;
-                }
-            }
-        )
-        .subscribe();
-}
+    }
 
-// Helper function to append reply to open modal
+    document.getElementById('replyStickerToggleBtn')?.addEventListener('click', () => {
+    const drawer = document.getElementById('replyStickerDrawer');
+    if (!drawer) return;
+    if (drawer.style.display === 'none') {
+        drawer.style.display = 'block';
+        if (document.getElementById('replyStickerResultsTray').children.length === 0) {
+            fetchReplyGiphyStickers();
+        }
+    } else {
+        drawer.style.display = 'none';
+    }
+});
+
+// ==========================================
+// APPEND REPLY TO MODAL (WITH STICKER SUPPORT)
+// ==========================================
 function appendReplyToModal(reply, isOP) {
     const commentsContainer = document.getElementById('modal-comments-list');
     if (!commentsContainer) return;
@@ -1005,6 +1123,17 @@ function appendReplyToModal(reply, isOP) {
     const opTagHtml = isOP ? '<span class="op-badge" style="background:#1d9bf0; color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:6px;">OP</span>' : '';
     const displayTime = formatTimestampRelative(reply.created_at);
     
+    // ====== INTEGRATION: Render reply sticker if present ======
+    let replyStickerHtml = '';
+    if (reply.image_url) {
+        replyStickerHtml = `
+            <div class="comment-sticker-render" style="margin-top: 8px; display: flex;">
+                <img src="${reply.image_url}" loading="lazy" style="max-height: 100px; width: auto; object-fit: contain; border-radius: 6px;">
+            </div>
+        `;
+    }
+    // ===========================================================
+    
     replyNode.innerHTML = `
         <div style="display:flex; align-items:center; margin-bottom:4px;">
             <span style="font-weight:bold; font-size:13px; color:#f7f9fa;">Anonymous</span>
@@ -1012,6 +1141,7 @@ function appendReplyToModal(reply, isOP) {
             <span style="color:#71767b; font-size:12px; margin-left:6px;">· ${displayTime}</span>
         </div>
         <div style="font-size:14px; line-height:1.4; color:#e7e9ea; white-space:pre-wrap; word-break:break-word;">${escapeHtmlMarkup(reply.content)}</div>
+        ${replyStickerHtml}
     `;
     
     commentsContainer.appendChild(replyNode);
