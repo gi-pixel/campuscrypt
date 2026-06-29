@@ -625,6 +625,7 @@ async function fetchAndRenderComments(postId) {
 // 3. OPTIMISTIC REPLY INJECTION ENGINE
 // =========================================================================
 async function handleReplySubmit(postId) {
+    console.log("✅ Reply button clicked!");
     if (!postId) return;
 
     // FIX: Correct textarea ID
