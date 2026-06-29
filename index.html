@@ -1176,8 +1176,8 @@ body {
             <i class="fa-regular fa-face-smile" style="color: #1d9bf0; font-size: 20px;"></i>
           </button>
           
-          <button id="submit-reply-btn" class="post-btn" onclick="handleReplySubmit()">Reply</button>
-        </div>
+        <button  class="post-btn"  onclick="handleReplySubmit()">Reply</button>        
+      </div>
       </div>
     </div>
   </div>
@@ -1198,14 +1198,14 @@ body {
     };
 
     window.acceptRulesAndEnterApp = function() {
-        console.log("🚀 Entering CampusCrypt...");
+        console.log("Entering CampusCrypt...");
         var mainSplashLayer = document.getElementById('splash-layer');
         var mainAppLayout = document.querySelector('.twitter');
 
         // Save session tracking token immediately
-        var newSessionId = 'cc_peer_' + Math.random().toString(36).substring(2, 15);
-        localStorage.setItem('cc_session_id', newSessionId);
-        if (typeof currentSessionId !== 'undefined') currentSessionId = newSessionId;
+var newSessionId = 'SESSION_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
+localStorage.setItem('crypt_session', newSessionId);
+if (typeof currentSessionId !== 'undefined') currentSessionId = newSessionId;
 
         if (mainAppLayout) {
             mainAppLayout.style.opacity = '0';

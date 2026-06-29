@@ -15,6 +15,8 @@ const GIPHY_API_KEY = '1phayPh21mSPyikZDaw0xw0s6ikBIcxW';
 // ==========================================
 let scrollPosition = 0;
 let globalSelectedStickerUrl = null;
+let globalSelectedReplyStickerUrl = null;
+
 let isNewSession = false;
 
 // FIXED: Declare and pull tracking session token line linearly
@@ -101,8 +103,8 @@ function acceptRulesAndEnterApp() {
     const mainSplashLayer = document.getElementById('splash-layer');
     const mainAppLayout = document.querySelector('.twitter');
 
-    //  FIX 1: Explicitly commit the rules acceptance token to device memory
-    localStorage.setItem('cc_rules_accepted', 'true');
+    const newSessionId = 'SESSION_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
+    localStorage.setItem('crypt_session', newSessionId);
 
     if (mainAppLayout) {
         mainAppLayout.style.opacity = '0';
@@ -181,9 +183,11 @@ async function fetchAndRenderFeed(isRefresh = false) {
     if (!feedContainer) return;
     
     // 1. Render Loading Spinner Loop
-    feedContainer.innerHTML = `
-
-    `;
+feedContainer.innerHTML = `
+    <div style="padding: 50px; text-align: center; color: #71767b;">
+        <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 24px; color: #1d9bf0;"></i>
+    </div>
+`;
     
     const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     
@@ -343,7 +347,7 @@ function compilePostHtmlNode(post) {
         <div class="tweet-content">
             <div class="tweet-header">
                 <div class="header-meta-group">
-                    <span class="name">Anon</span>
+                    <span class="name">Anonymous</span>
                     <span class="handle">@anon</span>
                     <span class="time">· ${formattedTime}</span>
                     <span class="cat-badge">${getCategoryDisplayName(post.category)}</span>
@@ -468,29 +472,41 @@ async function handlePostSubmit() {
 async function togglePostLikeState(postId, buttonNode) {
     const countSpan = buttonNode.querySelector('.like-counter-val');
     let currentCount = parseInt(countSpan.textContent) || 0;
+    const isLiked = buttonNode.classList.contains('liked');
 
-    const { data: existingLike } = await supabaseClient
-        .from('likes')
-        .select('id')
-        .eq('post_id', postId)
-        .eq('session_id', currentSessionId)
-        .maybeSingle();
-
-    if (existingLike) {
-        countSpan.textContent = Math.max(0, currentCount - 1);
-        buttonNode.classList.remove('liked');
-
-        await supabaseClient
-            .from('likes')
-            .delete()
-            .match({ post_id: postId, session_id: currentSessionId });
-    } else {
-        countSpan.textContent = currentCount + 1;
-        buttonNode.classList.add('liked');
-
-        await supabaseClient
-            .from('likes')
-            .insert([{ post_id: postId, session_id: currentSessionId }]);
+    try {
+        if (isLiked) {
+            // Optimistic unlike
+            countSpan.textContent = Math.max(0, currentCount - 1);
+            buttonNode.classList.remove('liked');
+            
+            const { error } = await supabaseClient
+                .from('likes')
+                .delete()
+                .match({ post_id: postId, session_id: currentSessionId });
+            
+            if (error) throw error;
+        } else {
+            // Optimistic like
+            countSpan.textContent = currentCount + 1;
+            buttonNode.classList.add('liked');
+            
+            const { error } = await supabaseClient
+                .from('likes')
+                .insert([{ post_id: postId, session_id: currentSessionId }]);
+            
+            if (error) throw error;
+        }
+    } catch (err) {
+        // Revert UI on failure
+        countSpan.textContent = currentCount;
+        if (isLiked) {
+            buttonNode.classList.add('liked');
+        } else {
+            buttonNode.classList.remove('liked');
+        }
+        console.error('Like operation failed:', err);
+        alert('Failed to update like. Please try again.');
     }
 }
 
@@ -608,115 +624,66 @@ async function fetchAndRenderComments(postId) {
 // =========================================================================
 // 3. OPTIMISTIC REPLY INJECTION ENGINE
 // =========================================================================
-async function handleReplySubmit() {
-    const textarea = document.getElementById('reply-textarea');
-    const submitBtn = document.getElementById('submit-reply-btn');
-    const commentsContainer = document.getElementById('modal-comments-list');
+async function handleReplySubmit(postId) {
+    if (!postId) return;
 
-    if (!textarea || !submitBtn || !commentsContainer) {
-        console.error("Missing critical DOM elements in thread modal.");
+    // FIX: Correct textarea ID
+    const replyInput = document.getElementById('reply-textarea');
+    if (!replyInput) return;
+
+    const contentStr = replyInput.value.trim();
+    const stickerUrl = typeof globalSelectedReplyStickerUrl !== 'undefined' ? globalSelectedReplyStickerUrl : null;
+
+    if (!contentStr && !stickerUrl) {
+        console.warn("[!] Core block prevented: Cannot submit empty tracing track parameters.");
         return;
     }
 
-    const content = textarea.value.trim();
-    if (!content || !globalActiveFocusedPostId) return;
+    try {
+        console.log(`dispatching thread comment node payload to target post: ${postId}...`);
+        
+        const { data, error } = await supabaseClient
+            .from('replies')
+            .insert([
+                {
+                    post_id: postId,
+                    session_id: currentSessionId,
+                    content: contentStr,
+                    image_url: stickerUrl
+                }
+            ]);
 
-    // Lock controls to block multi-click race condition states
-    textarea.disabled = true;
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Posting...';
+        if (error) throw error;
 
-    const tempReplyContent = content;
-    const nowIsoString = new Date().toISOString();
-
-    // Clear loading state placeholders gracefully
-    if (commentsContainer.innerHTML.includes('No replies yet') || commentsContainer.innerHTML.includes('Reading responses')) {
-        commentsContainer.innerHTML = '';
-    }
-
-    // Build the optimistic UI card component block
-    const localNode = document.createElement('div');
-    localNode.className = 'reply-node temporary-optimistic-node';
-    localNode.style.cssText = 'width:100%; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.04); opacity: 0.6;'; 
-
-    const isOriginalPoster = currentSessionId === globalActiveThreadAuthorSessionId;
-    const opTagHtml = isOriginalPoster ? `<span style="background:#1d9bf0; color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:6px;">OP</span>` : '';
-
-    localNode.innerHTML = `
-        <div style="display:flex; align-items:center; margin-bottom:4px;">
-            <span style="font-weight:bold; font-size:13px; color:#f7f9fa;">Anon</span>
-            ${opTagHtml}
-            <span style="color:#71767b; font-size:12px; margin-left:6px;">· Just now</span>
-        </div>
-    `;
-
-    const textContainer = document.createElement('div');
-    textContainer.style.cssText = 'font-size:14px; line-height:1.4; color:#e7e9ea; white-space:pre-wrap; word-break:break-word;';
-    textContainer.textContent = tempReplyContent; 
-    localNode.appendChild(textContainer);
-    
-    commentsContainer.appendChild(localNode);
-
-    const modalScroll = document.querySelector('.modal-scroll');
-    if (modalScroll) {
-        modalScroll.scrollTop = modalScroll.scrollHeight;
-    }
-
-    // Reset input fields immediately for seamless look-and-feel transitions
-    textarea.value = '';
-    textarea.disabled = false;
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Reply';
-
-    // ====== INTEGRATION: Build payload with reply sticker ======
-    const replyPayload = {
-        post_id: globalActiveFocusedPostId,
-        content: tempReplyContent,
-        session_id: currentSessionId,
-        created_at: nowIsoString,
-        image_url: globalSelectedReplyStickerUrl || null  // ← ADD THIS LINE
-    };
-    // =========================================================
-
-    // Ship tracking records to backend tables quietly
-    const { error } = await supabaseClient
-        .from('replies')
-        .insert([replyPayload]);
-
-    if (error) {
-        console.error('Failed to sync reply to cloud database:', error.message);
-        localNode.remove();
-        alert('Transmission failed. Your message could not be encrypted.');
-        return;
-    }
-
-    // Solidify node presentation rules once verified by backend acknowledgments
-    localNode.style.opacity = '1'; 
-    localNode.classList.remove('temporary-optimistic-node');
-
-    // ====== INTEGRATION: Reset reply sticker state after successful submission ======
-    globalSelectedReplyStickerUrl = null;
-    const previewContainer = document.getElementById('replyStickerPreview');
-    if (previewContainer) {
-        previewContainer.style.display = 'none';
-        const previewImg = document.getElementById('previewReplyStickerImg');
-        if (previewImg) previewImg.src = '';
-    }
-    const searchInput = document.getElementById('replyStickerSearchInput');
-    if (searchInput) searchInput.value = '';
-    const drawer = document.getElementById('replyStickerDrawer');
-    if (drawer) drawer.style.display = 'none';
-    // ============================================================================
-
-    // Dynamically update your main feed metric displays inline
-    const mainTimelinePostCard = document.getElementById(`ui-post-${globalActiveFocusedPostId}`);
-    if (mainTimelinePostCard) {
-        // Find your comment badge span layout securely
-        const commentCounterSpan = mainTimelinePostCard.querySelector('.action.comment span');
-        if (commentCounterSpan) {
-            const currentCount = parseInt(commentCounterSpan.textContent) || 0;
-            commentCounterSpan.textContent = currentCount + 1;
+        replyInput.value = '';
+        if (typeof globalSelectedReplyStickerUrl !== 'undefined') {
+            globalSelectedReplyStickerUrl = null; 
         }
+        
+        // FIX: Use correct preview container ID and hide it
+        const stickerPreviewContainer = document.getElementById('replyStickerPreview');
+        if (stickerPreviewContainer) stickerPreviewContainer.style.display = 'none';
+
+        console.log("Data sync loop completed. Reloading internal node thread arrays...");
+        
+        // FIX: Call the correct function to refresh comments
+        if (typeof fetchAndRenderComments === 'function') {
+            await fetchAndRenderComments(postId);
+        }
+
+        // FIX: Update the comment count on the main feed card
+        const mainTimelinePostCard = document.getElementById(`ui-post-${postId}`);
+        if (mainTimelinePostCard) {
+            const commentCounterSpan = mainTimelinePostCard.querySelector('.comment-counter-val');
+            if (commentCounterSpan) {
+                const currentCount = parseInt(commentCounterSpan.textContent) || 0;
+                commentCounterSpan.textContent = currentCount + 1;
+            }
+        }
+
+    } catch (err) {
+        console.error('Failed executing standard comment pipeline transactions:', err.message || err);
+        alert('[!] Sync Timeout Encountered. Failed to post reply to network terminal wire.');
     }
 }
 
