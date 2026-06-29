@@ -9,17 +9,25 @@ const BANNED_KEYWORDS = [
     "cunt", "dick", "suicide", "vagina", "penis", "breast", "boobs", "boob", "stupid", "pussy", "rape", "slut", "ass" 
 ];
 const GIPHY_API_KEY = '1phayPh21mSPyikZDaw0xw0s6ikBIcxW'; 
-let globalSelectedStickerUrl = null;
+
+// ==========================================
+// APPLICATION LIFECYCLE GLOBAL STATES
+// ==========================================
 let scrollPosition = 0;
-
-
+let globalSelectedStickerUrl = null;
 let isNewSession = false;
 
+// FIXED: Declare and pull tracking session token line linearly
 let currentSessionId = localStorage.getItem('crypt_session');
+
 if (!currentSessionId) {
     isNewSession = true;
     currentSessionId = `SESSION_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
     localStorage.setItem('crypt_session', currentSessionId);
+    // Hard clear consent flag on storage resets to display terms 
+    localStorage.removeItem('cc_rules_accepted');
+} else {
+    isNewSession = false;
 }
 
 const badgeNode = document.getElementById('local-session-badge');
@@ -51,15 +59,50 @@ function advanceToRulesScreen() {
         rulesStage.classList.remove('hidden');
     }
 }
+
+
+// ==========================================
+// 2. CORE RE-ENGINEERED LIFECYCLE INITIALIZER
+// ==========================================
+window.addEventListener('DOMContentLoaded', () => {
+    const splashLayer = document.getElementById('splash-layer'); 
+    const mainAppLayout = document.querySelector('.twitter'); 
+    const hasAcceptedRules = localStorage.getItem('cc_rules_accepted');
+
+    // Route view frames depending on verified rule consent tokens
+    if (hasAcceptedRules) {
+        if (splashLayer) {
+            splashLayer.classList.add('hidden', 'fade-out');
+            splashLayer.style.display = 'none';
+        }
+        if (mainAppLayout) {
+            mainAppLayout.classList.remove('hidden');
+            mainAppLayout.style.opacity = '1';     
+        }
+        
+        //  FIXED: Only build timeline assets if profile token verification matches
+        fetchAndRenderFeed(false);
+        if (typeof initPresenceTracking === 'function') initPresenceTracking();
+        if (typeof initRealtimeSubscriptions === 'function') initRealtimeSubscriptions();
+        
+    } else {
+        // Unverified Profile Path: Enforce onboarding visual gates
+        if (mainAppLayout) mainAppLayout.classList.add('hidden');
+        if (splashLayer) {
+            splashLayer.classList.remove('hidden', 'fade-out');
+            splashLayer.style.display = 'flex';
+        }
+        //  FIXED: We skip fetchAndRenderFeed here to completely isolate race conditions!
+    }
+});
+
 function acceptRulesAndEnterApp() {
     console.log(" Verifying credential handshakes...");
     const mainSplashLayer = document.getElementById('splash-layer');
     const mainAppLayout = document.querySelector('.twitter');
 
-    // Generate and anchor secure layout token credentials
-    const newSessionId = 'cc_peer_' + Math.random().toString(36).substring(2, 15);
-    localStorage.setItem('cc_session_id', newSessionId);
-    currentSessionId = newSessionId;
+    //  FIX 1: Explicitly commit the rules acceptance token to device memory
+    localStorage.setItem('cc_rules_accepted', 'true');
 
     if (mainAppLayout) {
         mainAppLayout.style.opacity = '0';
@@ -82,45 +125,23 @@ function acceptRulesAndEnterApp() {
             mainSplashLayer.classList.add('hidden');
             mainSplashLayer.style.display = 'none';
         }
-        fetchAndRenderFeed();
+        
+        // FIX 2: Now that the splash is completely hidden, trigger a fresh feed render
+        // This will bypass the welcome/rules card because 'cc_rules_accepted' is now true!
+        fetchAndRenderFeed(false);
     }, 500);
 }
 
-// ==========================================
-// 2. CORE RE-ENGINEERED LIFECYCLE INITIALIZER
-// ==========================================
-window.addEventListener('DOMContentLoaded', () => {
-    const splashLayer = document.getElementById('splash-layer'); 
-    const mainAppLayout = document.querySelector('.twitter'); 
-
-    if (currentSessionId) {
-        // Returning Peer Profile Route
-        if (splashLayer) {
-            splashLayer.classList.add('hidden', 'fade-out');
-            splashLayer.style.display = 'none';
-        }
-        if (mainAppLayout) {
-            mainAppLayout.classList.remove('hidden');
-            mainAppLayout.style.opacity = '1';     
-        }
-        fetchAndRenderFeed();
-        initPresenceTracking();
-        initRealtimeSubscriptions();
-        
-    } else {
-        // Handshake Entry Stage Setup Route
-        if (mainAppLayout) mainAppLayout.classList.add('hidden');
-        if (splashLayer) {
-            splashLayer.classList.remove('hidden', 'fade-out');
-            splashLayer.style.display = 'flex';
-        }
-    }
-});
+// Interactive callback triggered by the welcome card CTA action button
+function acceptCampusRules() {
+    localStorage.setItem('cc_rules_accepted', 'true');
+    fetchAndRenderFeed(false); // Reload feed to show standard timelines smoothly
+}
 
 function checkSessionChange() {
     const storedSession = localStorage.getItem('crypt_session');
     if (storedSession && storedSession !== currentSessionId) {
-        console.log("🔄 External session change detected. Recalibrating state parameters...");
+        console.log("External session change detected. Recalibrating state parameters...");
         currentSessionId = storedSession;
         isNewSession = false; // System baseline established, drop initial welcome screen alerts
         fetchAndRenderFeed(false);
@@ -153,109 +174,97 @@ async function fetchAndRenderFeed(isRefresh = false) {
     if (isRefresh) {
         scrollPosition = window.scrollY;
     } else {
-        scrollPosition = 0; // Fresh tab change resets view height anchor cleanly
+        scrollPosition = 0; 
     }
     
     const feedContainer = document.getElementById('feed-container');
     if (!feedContainer) return;
     
-    // 1. Show cinematic spinner
+    // 1. Render Loading Spinner Loop
     feedContainer.innerHTML = `
-        <div id="feed-loading-state" style="padding: 50px; text-align: center; color: #71767b;">
-            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 24px; color: #1d9bf0;"></i>
-        </div>
+
     `;
     
     const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     
-    // 2. Base Query Construction
-    let query = supabaseClient.from('posts').select('*');
-    query = query.gt('created_at', fortyEightHoursAgo);
+    // 🌟 FIXED: Enclose networking promises within an explicit try/catch container block
+    try {
+        let query = supabaseClient.from('posts').select('*');
+        query = query.gt('created_at', fortyEightHoursAgo);
 
-    if (typeof globalCurrentCategory !== 'undefined' && globalCurrentCategory !== 'all') {
-        query = query.eq('category', globalCurrentCategory);
-    }
+        if (typeof globalCurrentCategory !== 'undefined' && globalCurrentCategory !== 'all') {
+            query = query.eq('category', globalCurrentCategory);
+        }
 
-    // Apply sorting rules and fetch records capped at the 60-post ceiling
-    const { data: posts, error } = await query
-        .order('created_at', { ascending: false })
-        .limit(60);
+        const { data: posts, error } = await query
+            .order('created_at', { ascending: false })
+            .limit(60);
 
-    // Clear spinner element
-    feedContainer.innerHTML = '';
+        if (error) throw error;
 
-    if (error) {
-        console.error('Database Sync Error:', error.message);
-        feedContainer.innerHTML = `<div style="padding: 40px; text-align: center; color: #f91880; font-family: monospace;">[!] SECURE SYNC FAILURE.</div>`;
-        return;
-    }
+        // Clear spinner element completely
+        feedContainer.innerHTML = '';
 
-    // INTEGRATION: Dynamic Empty / Welcome States
-    if (!posts || posts.length === 0) {
-        if (typeof isNewSession !== 'undefined' && isNewSession) {
-            feedContainer.innerHTML = `
-                <div class="welcome-state" style="padding: 50px 20px; text-align: center; color: #71767b;">
-                    <div style="font-size: 48px; margin-bottom: 16px;">👋</div>
-                    <p style="font-size: 20px; font-weight: bold; color: #ffffff; margin-bottom: 8px;">Welcome to CampusCrypt!</p>
-                    <p style="font-size: 14px; max-width: 280px; margin: 0 auto;">Be the first to drop an anonymous trace on this network wire.</p>
-                </div>
-            `;
-        } else {
+        // Dynamic Empty State Handling
+        if (!posts || posts.length === 0) {
             feedContainer.innerHTML = `
                 <div style="padding: 40px; text-align: center; color: #71767b; font-size: 14px;">
-                    No active anonymous encryption tracks on this wire.
+                    No active anonymous posts on this wire.
                 </div>
             `;
+            return;
         }
-        return;
-    }
 
-    // 🌟 INTEGRATION: Trending Sorting Hook
-    if (typeof globalCurrentFeedTab !== 'undefined' && globalCurrentFeedTab === 'trending') {
-        // Sorts descending based on live metric arrays before DOM insertion loops kick off
-        posts.sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0));
-    }
+        // Apply tab filtering/sorting arrays
+        if (typeof globalCurrentFeedTab !== 'undefined' && globalCurrentFeedTab === 'trending') {
+            posts.sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0));
+        }
 
-    // 3. Stagger-render layout cards with native hardware acceleration
-    let renderedCount = 0;
+        // 2. Performance optimized hardware-accelerated stagger loop rendering
+        let renderedCount = 0;
+        posts.forEach((post, index) => {
+            setTimeout(() => {
+                post.likes_count = post.likes_count ?? '...';
+                post.reply_count = post.reply_count ?? '...';
+                post.has_user_liked = post.has_user_liked ?? false;
 
-    posts.forEach((post, index) => {
-        setTimeout(() => {
-            // Safe fallback defaults preserve any real metrics parsed during stream transactions
-            post.likes_count = post.likes_count ?? '...';
-            post.reply_count = post.reply_count ?? '...';
-            post.has_user_liked = post.has_user_liked ?? false;
-
-            const modernNode = compilePostHtmlNode(post);
-            if (!modernNode) return;
-            
-            modernNode.style.opacity = '0';
-            modernNode.style.transform = 'translateY(8px)';
-            modernNode.style.transition = 'opacity 0.25s ease, transform 0.25s ease-out';
-            modernNode.style.willChange = 'opacity, transform'; 
-            
-            feedContainer.appendChild(modernNode);
-            
-            requestAnimationFrame(() => {
-                modernNode.style.opacity = '1';
-                modernNode.style.transform = 'translateY(0)';
-            });
-
-            if (typeof lazyLoadPostMetrics === 'function') {
-                lazyLoadPostMetrics(post.id, modernNode);
-            }
-
-            // === 🌟 FIXED TRACKING DISPATCHER ===
-            renderedCount++;
-            // Execute the scroll restoration precisely on the last appended node frame
-            if (renderedCount === posts.length) {
+                const modernNode = compilePostHtmlNode(post);
+                if (!modernNode) return;
+                
+                modernNode.style.opacity = '0';
+                modernNode.style.transform = 'translateY(8px)';
+                modernNode.style.transition = 'opacity 0.25s ease, transform 0.25s ease-out';
+                modernNode.style.willChange = 'opacity, transform'; 
+                
+                feedContainer.appendChild(modernNode);
+                
                 requestAnimationFrame(() => {
-                    window.scrollTo(0, scrollPosition);
+                    modernNode.style.opacity = '1';
+                    modernNode.style.transform = 'translateY(0)';
                 });
-            }
 
-        }, index * 30); 
-    });
+                if (typeof lazyLoadPostMetrics === 'function') {
+                    lazyLoadPostMetrics(post.id, modernNode);
+                }
+
+                renderedCount++;
+                if (renderedCount === posts.length) {
+                    requestAnimationFrame(() => {
+                        window.scrollTo(0, scrollPosition);
+                    });
+                }
+            }, index * 30); 
+        });
+
+    } catch (err) {
+        console.error('Timeline Network Synchronization Failure:', err.message || err);
+        // Fallback UI safely clears out the spinning state
+        feedContainer.innerHTML = `
+            <div style="padding: 40px; text-align: center; color: #f91880; font-family: monospace; font-size: 13px;">
+                NETWORK TRANSACT ERROR: SECURE SYNC FAILURE. PLEASE REBOOT INTERFACE.
+            </div>
+        `;
+    }
 }
 
 /**
@@ -275,18 +284,24 @@ async function lazyLoadPostMetrics(postId, postNodeElement) {
         const repliesCount = repliesRes.count || 0;
         const hasUserLiked = !!userLikedRes.data;
 
-        // Find the target counter text areas inside this specific post element card
-        // Note: Update these querySelectors to match the exact class names inside your compilePostHtmlNode template!
-        const likeSpan = postNodeElement.querySelector('.like-count-selector span, .like span');
-        const replySpan = postNodeElement.querySelector('.reply-count-selector span, .comment span');
-        const likeIcon = postNodeElement.querySelector('.like-icon-selector, .like i');
+        // 🌟 FIXED: Target explicit unique classes instead of brittle generic tag hierarchies
+        const likeSpan = postNodeElement.querySelector('.like-counter-val');
+        const replySpan = postNodeElement.querySelector('.comment-counter-val');
+        const likeIcon = postNodeElement.querySelector('.like i');
 
         // Dynamically inject the real values into the already visible node card
         if (likeSpan) likeSpan.textContent = likesCount;
         if (replySpan) replySpan.textContent = repliesCount;
         
-        if (hasUserLiked && likeIcon) {
-            likeIcon.classList.add('liked'); // Highlights heart/upvote if they liked it previously
+        if (hasUserLiked) {
+            if (likeIcon) {
+                likeIcon.classList.remove('fa-regular');
+                likeIcon.classList.add('fa-solid', 'liked'); 
+            }
+            const likeActionDiv = postNodeElement.querySelector('.action.like');
+            if (likeActionDiv) {
+                likeActionDiv.classList.add('liked');
+            }
         }
 
         postNodeElement.dataset.trendingScore = likesCount + (repliesCount * 2);
@@ -322,7 +337,6 @@ function compilePostHtmlNode(post) {
             </div>
         `;
     }
-    // ========================================
 
     postCard.innerHTML = `
         <div class="avatar">🥷</div>
@@ -341,7 +355,7 @@ function compilePostHtmlNode(post) {
             <div class="actions">
                 <div class="action comment">
                     <i class="fa-regular fa-comment"></i>
-                    <span>${post.reply_count}</span>
+                    <span class="comment-counter-val">${post.reply_count}</span>
                 </div>
                 <div class="action like ${likeActiveStateClass}" onclick="event.stopPropagation(); togglePostLikeState('${post.id}', this)">
                     <i class="fa-regular fa-heart"></i>
