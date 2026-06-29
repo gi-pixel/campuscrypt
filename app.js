@@ -10,9 +10,14 @@ const BANNED_KEYWORDS = [
 ];
 const GIPHY_API_KEY = '1phayPh21mSPyikZDaw0xw0s6ikBIcxW'; 
 let globalSelectedStickerUrl = null;
+let scrollPosition = 0;
 
-let currentSessionId = localStorage.getItem('cc_session_id');
+
+let isNewSession = false;
+
+let currentSessionId = localStorage.getItem('crypt_session');
 if (!currentSessionId) {
+    isNewSession = true;
     currentSessionId = `SESSION_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
     localStorage.setItem('crypt_session', currentSessionId);
 }
@@ -37,7 +42,7 @@ let globalActiveFocusedPostId = null;
 // ==========================================
 
 function advanceToRulesScreen() {
-    console.log("👉 Advancing to rules stage...");
+    console.log(" Advancing to rules stage...");
     const welcomeStage = document.getElementById('splash-stage-welcome');
     const rulesStage = document.getElementById('splash-stage-rules');
     
@@ -47,7 +52,7 @@ function advanceToRulesScreen() {
     }
 }
 function acceptRulesAndEnterApp() {
-    console.log("🚀 Verifying credential handshakes...");
+    console.log(" Verifying credential handshakes...");
     const mainSplashLayer = document.getElementById('splash-layer');
     const mainAppLayout = document.querySelector('.twitter');
 
@@ -112,7 +117,17 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+function checkSessionChange() {
+    const storedSession = localStorage.getItem('crypt_session');
+    if (storedSession && storedSession !== currentSessionId) {
+        console.log("🔄 External session change detected. Recalibrating state parameters...");
+        currentSessionId = storedSession;
+        isNewSession = false; // System baseline established, drop initial welcome screen alerts
+        fetchAndRenderFeed(false);
+    }
+}
 
+window.addEventListener('focus', checkSessionChange);
 
 // ==========================================
 // 2. NEW COMPOSER MODAL WINDOW TOGGLES
@@ -133,11 +148,18 @@ function closeComposerModal() {
 
 
 
-async function fetchAndRenderFeed() {
+async function fetchAndRenderFeed(isRefresh = false) {
+    // === SCROLL POSITION: ONLY SAVE IF REFRESHING SAME TAB ===
+    if (isRefresh) {
+        scrollPosition = window.scrollY;
+    } else {
+        scrollPosition = 0; // Fresh tab change resets view height anchor cleanly
+    }
+    
     const feedContainer = document.getElementById('feed-container');
     if (!feedContainer) return;
     
-    // 1. Show a sleek cinematic spinner instead of a blank layout flash while waiting
+    // 1. Show cinematic spinner
     feedContainer.innerHTML = `
         <div id="feed-loading-state" style="padding: 50px; text-align: center; color: #71767b;">
             <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 24px; color: #1d9bf0;"></i>
@@ -146,23 +168,20 @@ async function fetchAndRenderFeed() {
     
     const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     
-    // 2. Base Query Construction: Bulletproof builder chain referencing
+    // 2. Base Query Construction
     let query = supabaseClient.from('posts').select('*');
-
-    // Filter by timestamp bounds parameters
     query = query.gt('created_at', fortyEightHoursAgo);
 
-    // Conditional category checking execution
     if (typeof globalCurrentCategory !== 'undefined' && globalCurrentCategory !== 'all') {
         query = query.eq('category', globalCurrentCategory);
     }
 
-    // Apply sorting rules and fetch records capped at a high performance safety ceiling
+    // Apply sorting rules and fetch records capped at the 60-post ceiling
     const { data: posts, error } = await query
         .order('created_at', { ascending: false })
-        .limit(40);
+        .limit(60);
 
-    // Wipe out the loading spinner state cleanly right before rendering content blocks
+    // Clear spinner element
     feedContainer.innerHTML = '';
 
     if (error) {
@@ -171,40 +190,72 @@ async function fetchAndRenderFeed() {
         return;
     }
 
+    // INTEGRATION: Dynamic Empty / Welcome States
     if (!posts || posts.length === 0) {
-        feedContainer.innerHTML = `<div style="padding: 40px; text-align: center; color: #71767b; font-size: 14px;">No active anonymous encryption tracks on this wire.</div>`;
+        if (typeof isNewSession !== 'undefined' && isNewSession) {
+            feedContainer.innerHTML = `
+                <div class="welcome-state" style="padding: 50px 20px; text-align: center; color: #71767b;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">👋</div>
+                    <p style="font-size: 20px; font-weight: bold; color: #ffffff; margin-bottom: 8px;">Welcome to CampusCrypt!</p>
+                    <p style="font-size: 14px; max-width: 280px; margin: 0 auto;">Be the first to drop an anonymous trace on this network wire.</p>
+                </div>
+            `;
+        } else {
+            feedContainer.innerHTML = `
+                <div style="padding: 40px; text-align: center; color: #71767b; font-size: 14px;">
+                    No active anonymous encryption tracks on this wire.
+                </div>
+            `;
+        }
         return;
     }
 
+    // 🌟 INTEGRATION: Trending Sorting Hook
+    if (typeof globalCurrentFeedTab !== 'undefined' && globalCurrentFeedTab === 'trending') {
+        // Sorts descending based on live metric arrays before DOM insertion loops kick off
+        posts.sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0));
+    }
+
     // 3. Stagger-render layout cards with native hardware acceleration
+    let renderedCount = 0;
+
     posts.forEach((post, index) => {
-    setTimeout(() => {
-        post.likes_count = '...';
-        post.reply_count = '...';
-        post.has_user_liked = false;
+        setTimeout(() => {
+            // Safe fallback defaults preserve any real metrics parsed during stream transactions
+            post.likes_count = post.likes_count ?? '...';
+            post.reply_count = post.reply_count ?? '...';
+            post.has_user_liked = post.has_user_liked ?? false;
 
-        const modernNode = compilePostHtmlNode(post);
-        if (!modernNode) return;
-        
-        modernNode.style.opacity = '0';
-        modernNode.style.transform = 'translateY(8px)';
-        modernNode.style.transition = 'opacity 0.25s ease, transform 0.25s ease-out';
-        modernNode.style.willChange = 'opacity, transform'; 
-        
-        feedContainer.appendChild(modernNode);
-        
-        requestAnimationFrame(() => {
-            modernNode.style.opacity = '1';
-            modernNode.style.transform = 'translateY(0)';
-        });
+            const modernNode = compilePostHtmlNode(post);
+            if (!modernNode) return;
+            
+            modernNode.style.opacity = '0';
+            modernNode.style.transform = 'translateY(8px)';
+            modernNode.style.transition = 'opacity 0.25s ease, transform 0.25s ease-out';
+            modernNode.style.willChange = 'opacity, transform'; 
+            
+            feedContainer.appendChild(modernNode);
+            
+            requestAnimationFrame(() => {
+                modernNode.style.opacity = '1';
+                modernNode.style.transform = 'translateY(0)';
+            });
 
-        if (typeof lazyLoadPostMetrics === 'function') {
-            lazyLoadPostMetrics(post.id, modernNode);
-        }
+            if (typeof lazyLoadPostMetrics === 'function') {
+                lazyLoadPostMetrics(post.id, modernNode);
+            }
 
-    }, index * 30); 
-});
+            // === 🌟 FIXED TRACKING DISPATCHER ===
+            renderedCount++;
+            // Execute the scroll restoration precisely on the last appended node frame
+            if (renderedCount === posts.length) {
+                requestAnimationFrame(() => {
+                    window.scrollTo(0, scrollPosition);
+                });
+            }
 
+        }, index * 30); 
+    });
 }
 
 /**
@@ -814,39 +865,97 @@ function filterByCategory(categoryName, elementNode) {
     }
 }
 
-// ==========================================
-// 7. REAL-TIME EVENT STREAM TUNNELS
-// ==========================================
+// ==========================================================================
+//  UNIFIED REAL-TIME DATA STREAM PIPELINE (POSTS LAYER)
+// ==========================================================================
+function initRealtimeSubscriptions() {
+    console.log(" Initializing secure real-time stream links...");
 
-function initializeRealTimePipeline() {
     supabaseClient
         .channel('public-feed-stream')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, async (payload) => {
-            if (payload.eventType === 'INSERT') {
-                if (globalCurrentCategory === 'all' || globalCurrentCategory === payload.new.category) {
-                    if (globalCurrentFeedTab === 'latest') {
-                        const container = document.getElementById('feed-container');
-                        if (container.querySelector('div[style*="text-align:center"]')) container.innerHTML = '';
-                        
-                        const incomingPost = payload.new;
-                        if (document.getElementById(`ui-post-${incomingPost.id}`)) return;
+        .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'posts' }, 
+            async (payload) => {
+                
+                // ----------------------------------------------------------
+                // CASE A: NEW INCOMING POST BROADCAST
+                // ----------------------------------------------------------
+                if (payload.eventType === 'INSERT') {
+                    const newPost = payload.new;
+                    console.log('📡 New incoming post tracked:', newPost);
 
-                        incomingPost.likes_count = 0;
-                        incomingPost.reply_count = 0;
-                        incomingPost.has_user_liked = false;
+                    // 🛑 GUARDRAIL 1: Ignore insertion if the local user authored it
+                    if (newPost.session_id === currentSessionId) return;
+
+                    // 🛑 GUARDRAIL 2: Process PWA app badge indices if application window is backgrounded
+                    if (document.visibilityState === 'hidden') {
+                        let unreadCount = parseInt(localStorage.getItem('crypt_unread')) || 0;
+                        unreadCount++;
+                        localStorage.setItem('crypt_unread', unreadCount);
+                        if ('setAppBadge' in navigator) {
+                            navigator.setAppBadge(unreadCount).catch((err) => console.error("Badge sync error:", err));
+                        }
+                    }
+
+                    // 🛑 GUARDRAIL 3: Verify the post matches active user category filters
+                    if (typeof globalCurrentCategory !== 'undefined' && globalCurrentCategory !== 'all') {
+                        if (newPost.category !== globalCurrentCategory) return;
+                    }
+
+                    // 🛑 GUARDRAIL 4: Only auto-inject layouts directly if the user is looking at the 'Latest' stream
+                    if (globalCurrentFeedTab !== 'latest') return;
+
+                    const container = document.getElementById('feed-container');
+                    if (!container) return;
+
+                    // Clear empty state placeholders text gracefully
+                    if (container.querySelector('div[style*="text-align:center"]') || container.querySelector('div[style*="text-align: center"]')) {
+                        container.innerHTML = '';
+                    }
+
+                    // Protect node mapping structures from duplicating items
+                    if (document.getElementById(`ui-post-${newPost.id}`)) return;
+
+                    // Assign standard base counter metrics fallback
+                    newPost.likes_count = 0;
+                    newPost.reply_count = 0;
+                    newPost.has_user_liked = false;
+
+                    // Append node array with highlight feedback color transitions
+                    const incomingNode = compilePostHtmlNode(newPost);
+                    if (incomingNode) {
+                        incomingNode.style.backgroundColor = '#1d9bf015'; // Soft Twitter Blue glow highlights entry
+                        incomingNode.style.transition = 'background-color 0.5s ease';
                         
-                        const incomingNode = compilePostHtmlNode(incomingPost);
-                        incomingNode.style.background = '#16181c'; 
                         container.insertBefore(incomingNode, container.firstChild);
-                        setTimeout(() => incomingNode.style.background = 'transparent', 1500);
+                        
+                        // Fade glowing entry smoothly to standard transparent dark layout space
+                        setTimeout(() => { 
+                            incomingNode.style.backgroundColor = 'transparent'; 
+                        }, 2500);
                     }
                 }
-            } else if (payload.eventType === 'DELETE') {
-                const element = document.getElementById(`ui-post-${payload.old.id}`);
-                if (element) element.remove();
+
+                // ----------------------------------------------------------
+                // CASE B: REMOTE POST DELETION (MODERATION/ADMIN ENGINE FORCE)
+                // ----------------------------------------------------------
+                else if (payload.eventType === 'DELETE') {
+                    console.log('🗑️ Remote deletion command intercepted:', payload.old.id);
+                    const element = document.getElementById(`ui-post-${payload.old.id}`);
+                    if (element) {
+                        element.style.opacity = '0';
+                        element.style.transform = 'scale(0.95)';
+                        element.style.transition = 'all 0.3s ease';
+                        
+                        // Allow deletion animation frames to clear out before drop execution
+                        setTimeout(() => { element.remove(); }, 300);
+                    }
+                }
             }
-        })
-        .subscribe();
+        )
+        .subscribe((status) => {
+            console.log('📡 Post stream sync validation status:', status);
+        });
 }
 
 // ==========================================
@@ -987,108 +1096,7 @@ document.getElementById('replyStickerSearchInput')?.addEventListener('input', (e
 // ==========================================
 document.getElementById('removeReplyStickerBtn')?.addEventListener('click', removeReplySticker);
 
-// ==========================================
-// REAL-TIME WEBSOCKET SUBSCRIPTIONS
-// ==========================================
 
-function initRealtimeSubscriptions() {
-    
-    // ==========================================
-    // 1. SUBSCRIBE TO NEW POSTS (+ PWA BADGING)
-    // ==========================================
-    supabaseClient
-        .channel('posts-channel')
-        .on('postgres_changes', 
-            { event: 'INSERT', schema: 'public', table: 'posts' }, 
-            (payload) => {
-                console.log('📡 New post broadcast:', payload.new);
-                const newPost = payload.new;
-                
-                // Don't add if current user just posted
-                if (newPost.session_id === currentSessionId) return;
-                
-                // 🔔 PWA BADGE TRACKER: Process metrics if the application window is minimized/hidden
-                if (document.visibilityState === 'hidden') {
-                    let unreadCount = parseInt(localStorage.getItem('crypt_unread')) || 0;
-                    unreadCount++;
-                    
-                    localStorage.setItem('crypt_unread', unreadCount);
-                    if ('setAppBadge' in navigator) {
-                        navigator.setAppBadge(unreadCount).catch((err) => console.log("PWA Badge push error:", err));
-                    }
-                }
-                
-                // Check category filter
-                if (globalCurrentCategory !== 'all' && newPost.category !== globalCurrentCategory) return;
-                
-                // Only show on Latest tab
-                if (globalCurrentFeedTab !== 'latest') return;
-                
-                const container = document.getElementById('feed-container');
-                if (!container) return;
-                
-                // Remove empty state markup gracefully
-                if (container.children.length === 1 && container.querySelector('div[style*="text-align:center"]')) {
-                    container.innerHTML = '';
-                }
-                
-                newPost.likes_count = newPost.likes_count || 0;
-                newPost.reply_count = newPost.reply_count || 0;
-                
-                const postNode = compilePostHtmlNode(newPost);
-                if (postNode) {
-                    postNode.style.background = '#1d9bf020';
-                    container.insertBefore(postNode, container.firstChild);
-                    setTimeout(() => { postNode.style.background = ''; }, 2000);
-                }
-            }
-        )
-        .subscribe((status) => {
-            console.log('Posts channel status:', status);
-        });
-    
-    // ==========================================
-    // 2. SUBSCRIBE TO NEW REPLIES
-    // ==========================================
-    supabaseClient
-        .channel('replies-channel')
-        .on('postgres_changes', 
-            { event: 'INSERT', schema: 'public', table: 'replies' }, 
-            async (payload) => {
-                console.log('📡 New reply broadcast:', payload.new);
-                const newReply = payload.new;
-                
-                // Skip if current user just replied
-                if (newReply.session_id === currentSessionId) return;
-                
-                // If thread modal is open for this post, add reply live
-                if (globalActiveFocusedPostId === newReply.post_id) {
-                    // Fetch OP session for badge matching
-                    const { data: postData } = await supabaseClient
-                        .from('posts')
-                        .select('session_id')
-                        .eq('id', newReply.post_id)
-                        .single();
-                    
-                    const isOP = postData?.session_id === newReply.session_id;
-                    appendReplyToModal(newReply, isOP);
-                }
-                
-                // Update reply count on timeline card layout
-                const timelineCard = document.getElementById(`ui-post-${newReply.post_id}`);
-                if (timelineCard) {
-                    const replySpan = timelineCard.querySelector('.action.comment span');
-                    if (replySpan) {
-                        const currentCount = parseInt(replySpan.textContent) || 0;
-                        replySpan.textContent = currentCount + 1;
-                    }
-                }
-            }
-        )
-        .subscribe((status) => {
-            console.log('Replies channel status:', status);
-        });
-    }
 
     document.getElementById('replyStickerToggleBtn')?.addEventListener('click', () => {
     const drawer = document.getElementById('replyStickerDrawer');
