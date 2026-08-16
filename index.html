@@ -1176,7 +1176,7 @@ body {
             <i class="fa-regular fa-face-smile" style="color: #1d9bf0; font-size: 20px;"></i>
           </button>
           
-        <button  class="post-btn"  onclick="handleReplySubmit()">Reply</button>        
+        <button class="post-btn" onclick="handleReplySubmit(globalActiveFocusedPostId)">Reply</button>        
       </div>
       </div>
     </div>
@@ -1203,36 +1203,38 @@ body {
         var mainAppLayout = document.querySelector('.twitter');
 
         // Save session tracking token immediately
-var newSessionId = 'SESSION_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
-localStorage.setItem('crypt_session', newSessionId);
-if (typeof currentSessionId !== 'undefined') currentSessionId = newSessionId;
+        var newSessionId = 'SESSION_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
+        localStorage.setItem('crypt_session', newSessionId);
+        if (typeof currentSessionId !== 'undefined') currentSessionId = newSessionId;
 
-        if (mainAppLayout) {
-            mainAppLayout.style.opacity = '0';
-            mainAppLayout.classList.remove('hidden');
-            mainAppLayout.style.display = 'block';
-        }
+        localStorage.setItem('cc_rules_accepted', 'true');
 
-        if (mainSplashLayer) {
-            mainSplashLayer.classList.add('fade-out');
-        }
+                if (mainAppLayout) {
+                    mainAppLayout.style.opacity = '0';
+                    mainAppLayout.classList.remove('hidden');
+                    mainAppLayout.style.display = 'block';
+                }
 
-        setTimeout(function() {
-            if (mainAppLayout) {
-                mainAppLayout.style.transition = 'opacity 0.4s ease';
-                mainAppLayout.style.opacity = '1';
-            }
-        }, 150);
+                if (mainSplashLayer) {
+                    mainSplashLayer.classList.add('fade-out');
+                }
 
-        setTimeout(function() {
-            if (mainSplashLayer) {
-                mainSplashLayer.classList.add('hidden');
-                mainSplashLayer.style.display = 'none';
-            }
-            if (typeof fetchAndRenderFeed === 'function') {
-                fetchAndRenderFeed();
-            }
-        }, 500);
+                setTimeout(function() {
+                    if (mainAppLayout) {
+                        mainAppLayout.style.transition = 'opacity 0.4s ease';
+                        mainAppLayout.style.opacity = '1';
+                    }
+                }, 150);
+
+                setTimeout(function() {
+                    if (mainSplashLayer) {
+                        mainSplashLayer.classList.add('hidden');
+                        mainSplashLayer.style.display = 'none';
+                    }
+                    if (typeof fetchAndRenderFeed === 'function') {
+                        fetchAndRenderFeed();
+                    }
+                }, 500);
     };
   </script>
 </body>

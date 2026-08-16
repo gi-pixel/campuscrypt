@@ -6,7 +6,7 @@ const SUPABASE_URL = 'https://xtqfbaqckgodxmsnyexh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0cWZiYXFja2dvZHhtc255ZXhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTgwODIsImV4cCI6MjA5Njg3NDA4Mn0.cWsx_9gyk3m9Dz6ZMn_8qHQ0s_20qiNvJTUn8Q0p3uM';
 const BANNED_KEYWORDS = [
     "kill", "porno", "porn", "fuck", "fvck", "bitch", "asshole", 
-    "cunt", "dick", "suicide", "vagina", "penis", "breast", "boobs", "boob", "stupid", "pussy", "rape", "slut", "ass" 
+    "cunt", "dick", "suicide", "vagina", "penis", "breast", "boobs", "boob", "stupid", "pussy", "rape", "slut", "ass" , "tits"
 ];
 const GIPHY_API_KEY = '1phayPh21mSPyikZDaw0xw0s6ikBIcxW'; 
 
@@ -26,7 +26,6 @@ if (!currentSessionId) {
     isNewSession = true;
     currentSessionId = `SESSION_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
     localStorage.setItem('crypt_session', currentSessionId);
-    // Hard clear consent flag on storage resets to display terms 
     localStorage.removeItem('cc_rules_accepted');
 } else {
     isNewSession = false;
@@ -94,58 +93,52 @@ window.addEventListener('DOMContentLoaded', () => {
             splashLayer.classList.remove('hidden', 'fade-out');
             splashLayer.style.display = 'flex';
         }
-        //  FIXED: We skip fetchAndRenderFeed here to completely isolate race conditions!
     }
 });
 
-function acceptRulesAndEnterApp() {
-    console.log(" Verifying credential handshakes...");
-    const mainSplashLayer = document.getElementById('splash-layer');
-    const mainAppLayout = document.querySelector('.twitter');
+// function acceptRulesAndEnterApp() {
+//     console.log(" Verifying credential handshakes...");
+//     const mainSplashLayer = document.getElementById('splash-layer');
+//     const mainAppLayout = document.querySelector('.twitter');
 
-    const newSessionId = 'SESSION_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
-    localStorage.setItem('crypt_session', newSessionId);
+//     const newSessionId = 'SESSION_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
+//     localStorage.setItem('crypt_session', newSessionId);
 
-    if (mainAppLayout) {
-        mainAppLayout.style.opacity = '0';
-        mainAppLayout.classList.remove('hidden');
-    }
+//     if (mainAppLayout) {
+//         mainAppLayout.style.opacity = '0';
+//         mainAppLayout.classList.remove('hidden');
+//     }
 
-    if (mainSplashLayer) {
-        mainSplashLayer.classList.add('fade-out');
-    }
+//     if (mainSplashLayer) {
+//         mainSplashLayer.classList.add('fade-out');
+//     }
 
-    setTimeout(() => {
-        if (mainAppLayout) {
-            mainAppLayout.style.transition = 'opacity 0.4s ease';
-            mainAppLayout.style.opacity = '1';
-        }
-    }, 150);
+//     setTimeout(() => {
+//         if (mainAppLayout) {
+//             mainAppLayout.style.transition = 'opacity 0.4s ease';
+//             mainAppLayout.style.opacity = '1';
+//         }
+//     }, 150);
 
-    setTimeout(() => {
-        if (mainSplashLayer) {
-            mainSplashLayer.classList.add('hidden');
-            mainSplashLayer.style.display = 'none';
-        }
+//     setTimeout(() => {
+//         if (mainSplashLayer) {
+//             mainSplashLayer.classList.add('hidden');
+//             mainSplashLayer.style.display = 'none';
+//         }
         
-        // FIX 2: Now that the splash is completely hidden, trigger a fresh feed render
-        // This will bypass the welcome/rules card because 'cc_rules_accepted' is now true!
-        fetchAndRenderFeed(false);
-    }, 500);
-}
+//         // FIX 2: Now that the splash is completely hidden, trigger a fresh feed render
+//         // This will bypass the welcome/rules card because 'cc_rules_accepted' is now true!
+//         fetchAndRenderFeed(false);
+//     }, 500);
+// }
 
-// Interactive callback triggered by the welcome card CTA action button
-function acceptCampusRules() {
-    localStorage.setItem('cc_rules_accepted', 'true');
-    fetchAndRenderFeed(false); // Reload feed to show standard timelines smoothly
-}
 
 function checkSessionChange() {
     const storedSession = localStorage.getItem('crypt_session');
     if (storedSession && storedSession !== currentSessionId) {
         console.log("External session change detected. Recalibrating state parameters...");
         currentSessionId = storedSession;
-        isNewSession = false; // System baseline established, drop initial welcome screen alerts
+        isNewSession = false; 
         fetchAndRenderFeed(false);
     }
 }
@@ -172,7 +165,6 @@ function closeComposerModal() {
 
 
 async function fetchAndRenderFeed(isRefresh = false) {
-    // === SCROLL POSITION: ONLY SAVE IF REFRESHING SAME TAB ===
     if (isRefresh) {
         scrollPosition = window.scrollY;
     } else {
@@ -182,16 +174,15 @@ async function fetchAndRenderFeed(isRefresh = false) {
     const feedContainer = document.getElementById('feed-container');
     if (!feedContainer) return;
     
-    // 1. Render Loading Spinner Loop
-feedContainer.innerHTML = `
-    <div style="padding: 50px; text-align: center; color: #71767b;">
-        <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 24px; color: #1d9bf0;"></i>
-    </div>
-`;
+    // Show loading spinner
+    feedContainer.innerHTML = `
+        <div style="padding: 50px; text-align: center; color: #71767b;">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 24px; color: #1d9bf0;"></i>
+        </div>
+    `;
     
     const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     
-    // 🌟 FIXED: Enclose networking promises within an explicit try/catch container block
     try {
         let query = supabaseClient.from('posts').select('*');
         query = query.gt('created_at', fortyEightHoursAgo);
@@ -206,10 +197,8 @@ feedContainer.innerHTML = `
 
         if (error) throw error;
 
-        // Clear spinner element completely
         feedContainer.innerHTML = '';
 
-        // Dynamic Empty State Handling
         if (!posts || posts.length === 0) {
             feedContainer.innerHTML = `
                 <div style="padding: 40px; text-align: center; color: #71767b; font-size: 14px;">
@@ -219,20 +208,39 @@ feedContainer.innerHTML = `
             return;
         }
 
-        // Apply tab filtering/sorting arrays
+        // ✅ NEW: Batch query to check which posts this user has liked
+        const postIds = posts.map(p => p.id);
+        let likedPostIds = new Set();
+        
+        try {
+            const { data: userLikes } = await supabaseClient
+                .from('likes')
+                .select('post_id')
+                .in('post_id', postIds)
+                .eq('session_id', currentSessionId);
+            
+            if (userLikes && userLikes.length > 0) {
+                likedPostIds = new Set(userLikes.map(l => l.post_id));
+            }
+        } catch (likeErr) {
+            console.warn('Failed to fetch user likes:', likeErr);
+            // Continue without like data - user won't see their likes highlighted
+        }
+
+        // Apply trending sorting
         if (typeof globalCurrentFeedTab !== 'undefined' && globalCurrentFeedTab === 'trending') {
             posts.sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0));
         }
 
-        // 2. Performance optimized hardware-accelerated stagger loop rendering
+        // Render posts with stagger
         let renderedCount = 0;
         posts.forEach((post, index) => {
             setTimeout(() => {
-                post.likes_count = post.likes_count ?? '...';
-                post.reply_count = post.reply_count ?? '...';
-                post.has_user_liked = post.has_user_liked ?? false;
-
-                const modernNode = compilePostHtmlNode(post);
+                // ✅ Use counts directly from the post object
+                // ✅ Check if user liked this post from the batch Set
+                const hasUserLiked = likedPostIds.has(post.id);
+                
+                const modernNode = compilePostHtmlNode(post, hasUserLiked);
                 if (!modernNode) return;
                 
                 modernNode.style.opacity = '0';
@@ -247,10 +255,6 @@ feedContainer.innerHTML = `
                     modernNode.style.transform = 'translateY(0)';
                 });
 
-                if (typeof lazyLoadPostMetrics === 'function') {
-                    lazyLoadPostMetrics(post.id, modernNode);
-                }
-
                 renderedCount++;
                 if (renderedCount === posts.length) {
                     requestAnimationFrame(() => {
@@ -262,7 +266,6 @@ feedContainer.innerHTML = `
 
     } catch (err) {
         console.error('Timeline Network Synchronization Failure:', err.message || err);
-        // Fallback UI safely clears out the spinning state
         feedContainer.innerHTML = `
             <div style="padding: 40px; text-align: center; color: #f91880; font-family: monospace; font-size: 13px;">
                 NETWORK TRANSACT ERROR: SECURE SYNC FAILURE. PLEASE REBOOT INTERFACE.
@@ -271,51 +274,11 @@ feedContainer.innerHTML = `
     }
 }
 
-/**
- * Asynchronously fetches likes and replies for a single post card 
- * already rendered on the user's screen.
- */
-async function lazyLoadPostMetrics(postId, postNodeElement) {
-    try {
-        // Run all three metric queries concurrently in parallel to maximize network speed
-        const [likesRes, repliesRes, userLikedRes] = await Promise.all([
-            supabaseClient.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', postId),
-            supabaseClient.from('replies').select('*', { count: 'exact', head: true }).eq('post_id', postId),
-            supabaseClient.from('likes').select('id').eq('post_id', postId).eq('session_id', currentSessionId).maybeSingle()
-        ]);
 
-        const likesCount = likesRes.count || 0;
-        const repliesCount = repliesRes.count || 0;
-        const hasUserLiked = !!userLikedRes.data;
 
-        // 🌟 FIXED: Target explicit unique classes instead of brittle generic tag hierarchies
-        const likeSpan = postNodeElement.querySelector('.like-counter-val');
-        const replySpan = postNodeElement.querySelector('.comment-counter-val');
-        const likeIcon = postNodeElement.querySelector('.like i');
 
-        // Dynamically inject the real values into the already visible node card
-        if (likeSpan) likeSpan.textContent = likesCount;
-        if (replySpan) replySpan.textContent = repliesCount;
-        
-        if (hasUserLiked) {
-            if (likeIcon) {
-                likeIcon.classList.remove('fa-regular');
-                likeIcon.classList.add('fa-solid', 'liked'); 
-            }
-            const likeActionDiv = postNodeElement.querySelector('.action.like');
-            if (likeActionDiv) {
-                likeActionDiv.classList.add('liked');
-            }
-        }
 
-        postNodeElement.dataset.trendingScore = likesCount + (repliesCount * 2);
-
-    } catch (err) {
-        console.error(`Failed loading metrics background pipeline for post ${postId}:`, err);
-    }
-}
-
-function compilePostHtmlNode(post) {
+function compilePostHtmlNode(post, hasUserLiked = false) {
     const postCard = document.createElement('div');
     postCard.className = 'tweet';
     postCard.id = `ui-post-${post.id}`;
@@ -325,19 +288,21 @@ function compilePostHtmlNode(post) {
     const canDelete = isAuthor && minutesSinceCreation < 5;
 
     const formattedTime = typeof formatTimestampRelative === 'function' ? formatTimestampRelative(post.created_at) : '';
-    const likeActiveStateClass = post.has_user_liked ? 'liked' : '';
+    const likeActiveStateClass = hasUserLiked ? 'liked' : '';
     const safeContent = typeof escapeHtmlMarkup === 'function' ? escapeHtmlMarkup(post.content) : post.content;
 
     postCard.addEventListener('click', () => {
         openThreadModal(post.id, post.content, post.category, post.created_at);
     });
 
-    // ====== INTEGRATION: Sticker render ======
+    // Sticker render
     let stickerHtml = '';
     if (post.image_url) {
+        // ✅ FIX: Escape image_url to prevent XSS
+        const safeImageUrl = typeof escapeHtmlMarkup === 'function' ? escapeHtmlMarkup(post.image_url) : post.image_url;
         stickerHtml = `
             <div class="post-sticker-render" style="margin-top: 10px; display: flex; justify-content: flex-start;">
-                <img src="${post.image_url}" loading="lazy" style="max-height: 140px; width: auto; object-fit: contain; border-radius: 8px;">
+                <img src="${safeImageUrl}" loading="lazy" style="max-height: 140px; width: auto; object-fit: contain; border-radius: 8px;">
             </div>
         `;
     }
@@ -359,11 +324,11 @@ function compilePostHtmlNode(post) {
             <div class="actions">
                 <div class="action comment">
                     <i class="fa-regular fa-comment"></i>
-                    <span class="comment-counter-val">${post.reply_count}</span>
+                    <span class="comment-counter-val">${post.reply_count || 0}</span>
                 </div>
                 <div class="action like ${likeActiveStateClass}" onclick="event.stopPropagation(); togglePostLikeState('${post.id}', this)">
                     <i class="fa-regular fa-heart"></i>
-                    <span class="like-counter-val">${post.likes_count}</span>
+                    <span class="like-counter-val">${post.likes_count || 0}</span>
                 </div>
             </div>
         </div>
@@ -625,10 +590,9 @@ async function fetchAndRenderComments(postId) {
 // 3. OPTIMISTIC REPLY INJECTION ENGINE
 // =========================================================================
 async function handleReplySubmit(postId) {
-    console.log("✅ Reply button clicked!");
+    console.log(" Reply button clicked!");
     if (!postId) return;
 
-    // FIX: Correct textarea ID
     const replyInput = document.getElementById('reply-textarea');
     if (!replyInput) return;
 
@@ -661,22 +625,21 @@ async function handleReplySubmit(postId) {
             globalSelectedReplyStickerUrl = null; 
         }
         
-        // FIX: Use correct preview container ID and hide it
         const stickerPreviewContainer = document.getElementById('replyStickerPreview');
         if (stickerPreviewContainer) stickerPreviewContainer.style.display = 'none';
 
         console.log("Data sync loop completed. Reloading internal node thread arrays...");
         
-        // FIX: Call the correct function to refresh comments
         if (typeof fetchAndRenderComments === 'function') {
             await fetchAndRenderComments(postId);
         }
 
-        // FIX: Update the comment count on the main feed card
+        //  Update the comment count on the main feed card using the post's data
         const mainTimelinePostCard = document.getElementById(`ui-post-${postId}`);
         if (mainTimelinePostCard) {
             const commentCounterSpan = mainTimelinePostCard.querySelector('.comment-counter-val');
             if (commentCounterSpan) {
+                // Database trigger will update this, but we increment optimistically
                 const currentCount = parseInt(commentCounterSpan.textContent) || 0;
                 commentCounterSpan.textContent = currentCount + 1;
             }
