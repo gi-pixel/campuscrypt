@@ -8,7 +8,6 @@ const BANNED_KEYWORDS = [
     "kill", "porno", "porn", "fuck", "fvck", "bitch", "asshole", 
     "cunt", "dick", "suicide", "vagina", "penis", "breast", "boobs", "boob", "stupid", "pussy", "rape", "slut", "ass" , "tits"
 ];
-const GIPHY_API_KEY = '1phayPh21mSPyikZDaw0xw0s6ikBIcxW'; 
 
 // ==========================================
 // APPLICATION LIFECYCLE GLOBAL STATES
@@ -43,6 +42,8 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 let globalCurrentFeedTab = localStorage.getItem('cc_preferred_tab') || 'latest';
 let globalCurrentCategory = 'all';        
 let globalActiveFocusedPostId = null;   
+let feedRequestToken = 0;
+
 
 
 
@@ -170,6 +171,8 @@ async function fetchAndRenderFeed(isRefresh = false) {
     } else {
         scrollPosition = 0; 
     }
+
+    const myToken = ++feedRequestToken;
     
     const feedContainer = document.getElementById('feed-container');
     if (!feedContainer) return;
@@ -229,15 +232,19 @@ async function fetchAndRenderFeed(isRefresh = false) {
 
         // Apply trending sorting
         if (typeof globalCurrentFeedTab !== 'undefined' && globalCurrentFeedTab === 'trending') {
-            posts.sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0));
+            const orderCol = globalCurrentFeedTab === 'trending' ? 'likes_count' : 'created_at';
+            const { data: posts, error } = await query
+                .order(orderCol, { ascending: false })
+                .order('created_at', { ascending: false })
+                .limit(60);
         }
 
         // Render posts with stagger
         let renderedCount = 0;
         posts.forEach((post, index) => {
             setTimeout(() => {
-                // ✅ Use counts directly from the post object
-                // ✅ Check if user liked this post from the batch Set
+                // Use counts directly from the post object
+                // Check if user liked this post from the batch Set
                 const hasUserLiked = likedPostIds.has(post.id);
                 
                 const modernNode = compilePostHtmlNode(post, hasUserLiked);
@@ -248,6 +255,7 @@ async function fetchAndRenderFeed(isRefresh = false) {
                 modernNode.style.transition = 'opacity 0.25s ease, transform 0.25s ease-out';
                 modernNode.style.willChange = 'opacity, transform'; 
                 
+                if (myToken !== feedRequestToken) return;
                 feedContainer.appendChild(modernNode);
                 
                 requestAnimationFrame(() => {
@@ -387,6 +395,12 @@ async function handlePostSubmit() {
     if (error) {
         alert('Submission failed: ' + error.message);
         return;
+    }
+
+    const btn = document.getElementById('submit-post-btn');
+    if (btn) {
+        btn.disabled = true;
+        setTimeout(() => { btn.disabled = false; }, 10000);
     }
 
     // 8. Success: Clear out input states and reset visual trackers
@@ -565,12 +579,11 @@ async function fetchAndRenderComments(postId) {
         if (reply.image_url) {
             replyStickerHtml = `
                 <div class="comment-sticker-render" style="margin-top: 8px; display: flex;">
-                    <img src="${reply.image_url}" loading="lazy" style="max-height: 100px; width: auto; object-fit: contain; border-radius: 6px;">
+                    <img src="${escapeHtmlMarkup(reply.image_url)}" loading="lazy" style="max-height: 100px; width: auto; object-fit: contain; border-radius: 6px;">
                 </div>
             `;
         }
         // ===========================================================
-        
         // Build the reply HTML
         replyNode.innerHTML = `
             <div style="display:flex; align-items:center; margin-bottom:4px;">
@@ -599,8 +612,8 @@ async function handleReplySubmit(postId) {
     const contentStr = replyInput.value.trim();
     const stickerUrl = typeof globalSelectedReplyStickerUrl !== 'undefined' ? globalSelectedReplyStickerUrl : null;
 
-    if (!contentStr && !stickerUrl) {
-        console.warn("[!] Core block prevented: Cannot submit empty tracing track parameters.");
+    if (contentStr && containsProhibitedContent(contentStr)) {
+        alert('Reply blocked: your message contains language that violates the CampusCrypt Code of Respect.');
         return;
     }
 
@@ -616,7 +629,9 @@ async function handleReplySubmit(postId) {
                     content: contentStr,
                     image_url: stickerUrl
                 }
-            ]);
+            ])
+            .select()
+            .single();
 
         if (error) throw error;
 
@@ -631,7 +646,7 @@ async function handleReplySubmit(postId) {
         console.log("Data sync loop completed. Reloading internal node thread arrays...");
         
         if (typeof fetchAndRenderComments === 'function') {
-            await fetchAndRenderComments(postId);
+            appendReplyToModal(data, currentSessionId === globalActiveThreadAuthorSessionId);
         }
 
         //  Update the comment count on the main feed card using the post's data
@@ -739,8 +754,8 @@ async function fetchGiphyStickers(searchQuery = '') {
     tray.innerHTML = `<div style="color: #71767b; font-size: 12px; padding: 20px; text-align: center;">Loading stickers...</div>`;
     
     const url = searchQuery.trim() === ''
-        ? `https://api.giphy.com/v1/stickers/trending?api_key=${GIPHY_API_KEY}&limit=20&rating=g`
-        : `https://api.giphy.com/v1/stickers/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(searchQuery)}&limit=20&rating=g`;
+        ? `/api/giphy?mode=trending`
+        : `/api/giphy?mode=search&q=${encodeURIComponent(searchQuery)}`;
 
     try {
         const response = await fetch(url);
@@ -895,6 +910,15 @@ function initRealtimeSubscriptions() {
                         // Allow deletion animation frames to clear out before drop execution
                         setTimeout(() => { element.remove(); }, 300);
                     }
+                }   
+                
+                else if (payload.eventType === 'UPDATE') {
+                    const card = document.getElementById(`ui-post-${payload.new.id}`);
+                    if (!card) return;
+                    const likeSpan = card.querySelector('.like-counter-val');
+                    const replySpan = card.querySelector('.comment-counter-val');
+                    if (likeSpan) likeSpan.textContent = payload.new.likes_count || 0;
+                    if (replySpan) replySpan.textContent = payload.new.reply_count || 0;
                 }
             }
         )
@@ -967,8 +991,8 @@ async function fetchReplyGiphyStickers(searchQuery = '') {
     tray.innerHTML = `<div style="color: #71767b; font-size: 12px; padding: 20px; text-align: center;">Loading stickers...</div>`;
     
     const url = searchQuery.trim() === ''
-        ? `https://api.giphy.com/v1/stickers/trending?api_key=${GIPHY_API_KEY}&limit=20&rating=g`
-        : `https://api.giphy.com/v1/stickers/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(searchQuery)}&limit=20&rating=g`;
+        ? `/api/giphy?mode=trending`
+        : `/api/giphy?mode=search&q=${encodeURIComponent(searchQuery)}`;
 
     try {
         const response = await fetch(url);
@@ -1046,7 +1070,7 @@ document.getElementById('removeReplyStickerBtn')?.addEventListener('click', remo
     document.getElementById('replyStickerToggleBtn')?.addEventListener('click', () => {
     const drawer = document.getElementById('replyStickerDrawer');
     if (!drawer) return;
-    if (drawer.style.display === 'none') {
+    if (drawer.style.display === 'none' || drawer.style.display === '') {
         drawer.style.display = 'block';
         if (document.getElementById('replyStickerResultsTray').children.length === 0) {
             fetchReplyGiphyStickers();
@@ -1081,7 +1105,7 @@ function appendReplyToModal(reply, isOP) {
     if (reply.image_url) {
         replyStickerHtml = `
             <div class="comment-sticker-render" style="margin-top: 8px; display: flex;">
-                <img src="${reply.image_url}" loading="lazy" style="max-height: 100px; width: auto; object-fit: contain; border-radius: 6px;">
+                <img src="${escapeHtmlMarkup(reply.image_url)}" loading="lazy" style="max-height: 100px; width: auto; object-fit: contain; border-radius: 6px;">
             </div>
         `;
     }

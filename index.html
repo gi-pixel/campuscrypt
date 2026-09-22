@@ -1071,7 +1071,7 @@ body {
  <div class="bottom-nav">
     <i class="fa-solid fa-house" onclick="window.location.reload()"></i>
     <i class="fa-solid fa-plus" onclick="openComposerModal()" style="color: #1d9bf0;"></i>
-    <i class="fa-solid fa-magnifying-glass" onclick="document.getElementById('feed-search-input').focus()"></i>
+    <i class="fa-solid fa-magnifying-glass" onclick="document.getElementById('feed-search-input')?.focus()"></i>
   </div>
 
 <div id="composer-modal" class="modal-overlay hidden" onclick="closeComposerModal()">
@@ -1202,10 +1202,10 @@ body {
         var mainSplashLayer = document.getElementById('splash-layer');
         var mainAppLayout = document.querySelector('.twitter');
 
-        // Save session tracking token immediately
-        var newSessionId = 'SESSION_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
-        localStorage.setItem('crypt_session', newSessionId);
-        if (typeof currentSessionId !== 'undefined') currentSessionId = newSessionId;
+        // // Save session tracking token immediately
+        // var newSessionId = 'SESSION_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
+        // localStorage.setItem('crypt_session', newSessionId);
+        // if (typeof currentSessionId !== 'undefined') currentSessionId = newSessionId;
 
         localStorage.setItem('cc_rules_accepted', 'true');
 
